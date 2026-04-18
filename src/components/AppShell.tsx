@@ -1,6 +1,6 @@
 'use client';
 
-import { BookOpen, Building2, ClipboardList, Globe, Hash, LayoutDashboard, LogOut, Settings, Smartphone, Users, Wallet } from 'lucide-react';
+import { BookOpen, Building2, ClipboardList, Globe, Hash, LayoutDashboard, LogOut, Menu, Settings, Smartphone, Users, Wallet, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { ReactNode, useEffect, useState } from 'react';
@@ -11,6 +11,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [checked, setChecked] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const isPublic = pathname.startsWith('/share');
   const isLogin = pathname.startsWith('/login');
@@ -34,6 +35,21 @@ export default function AppShell({ children }: { children: ReactNode }) {
     });
   }, [pathname, isPublic, isLogin, router]);
 
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [sidebarOpen]);
+
   if (isPublic) {
     return (
       <div className="public-shell">
@@ -56,11 +72,32 @@ export default function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="layout-wrapper">
-      <aside className="sidebar">
+    <div className={`layout-wrapper ${sidebarOpen ? 'sidebar-open' : ''}`}>
+      <button
+        type="button"
+        className="mobile-menu-toggle"
+        onClick={() => setSidebarOpen(true)}
+        aria-label="Open navigation"
+      >
+        <Menu size={22} />
+      </button>
+      <div
+        className={`sidebar-backdrop ${sidebarOpen ? 'visible' : ''}`}
+        onClick={() => setSidebarOpen(false)}
+        aria-hidden="true"
+      />
+      <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="logo-section">
           <div className="logo-icon">A</div>
           <span className="logo-text">AppManager<span className="gold">Pro</span></span>
+          <button
+            type="button"
+            className="sidebar-close"
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Close navigation"
+          >
+            <X size={20} />
+          </button>
         </div>
 
         <nav className="nav-menu">

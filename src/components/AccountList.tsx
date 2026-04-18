@@ -159,7 +159,7 @@ export default function AccountList({ initialAccounts }: { initialAccounts: any[
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
 
         {/* Column headers */}
-        <div style={{
+        <div className="account-list-header" style={{
           display: 'grid',
           gridTemplateColumns: '2fr 1.5fr 0.8fr 1fr 1.5fr',
           padding: '0 20px',
@@ -192,6 +192,7 @@ export default function AccountList({ initialAccounts }: { initialAccounts: any[
         {filtered.map(acc => (
           <div
             key={acc.id}
+            className="account-list-row"
             style={{
               display: 'grid',
               gridTemplateColumns: '2fr 1.5fr 0.8fr 1fr 1.5fr',
