@@ -20,7 +20,7 @@ export default function EditAppModal({ app }: { app: any }) {
   // Visual Assets State
   const [iconPreview, setIconPreview] = useState<string | null>(app.icon_small_path || null);
   const [promoPreview, setPromoPreview] = useState<string | null>(app.icon_large_path || null);
-  const [existingScreenshots, setExistingScreenshots] = useState(app.screenshots || []);
+  const [existingScreenshots, setExistingScreenshots] = useState<{ id: number; file_path: string }[]>(app.screenshots || []);
   const [newScreenshotPreviews, setNewScreenshotPreviews] = useState<string[]>([]);
   const [newScreenshotFiles, setNewScreenshotFiles] = useState<File[]>([]);
 
@@ -87,7 +87,7 @@ export default function EditAppModal({ app }: { app: any }) {
     if (!confirm('Are you sure you want to delete this screenshot?')) return;
     const res = await deleteScreenshot(id);
     if (res.success) {
-      setExistingScreenshots(prev => prev.filter((s: any) => s.id !== id));
+      setExistingScreenshots(prev => prev.filter(s => s.id !== id));
     } else {
       alert(res.error);
     }
