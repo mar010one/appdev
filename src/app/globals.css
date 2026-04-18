@@ -6180,6 +6180,142 @@ input:focus, select:focus, textarea:focus {
     min-width: 0;
   }
 
+  /* ===== Accounts page — modernized mobile layout ===== */
+
+  /* Page header: stack title + CTA, make CTA full-width */
+  .accounts-page-header {
+    display: flex !important;
+    flex-direction: column;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    gap: 16px;
+    margin-bottom: 24px !important;
+  }
+  .accounts-page-header .accounts-page-header-text h1 {
+    font-size: 1.75rem !important;
+    line-height: 1.15;
+    margin-bottom: 6px;
+  }
+  .accounts-page-header .accounts-page-header-text p {
+    font-size: 0.9rem !important;
+    line-height: 1.45;
+  }
+  .accounts-page-header > .btn,
+  .accounts-page-header > button.btn {
+    width: 100%;
+    padding: 14px 18px;
+    border-radius: 14px;
+    font-size: 0.95rem;
+  }
+
+  /* Stats: compact 3-column grid that fits any phone */
+  .accounts-stats {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px !important;
+  }
+  .accounts-stat-card {
+    flex: unset !important;
+    padding: 14px 12px !important;
+    border-radius: 14px !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+    min-width: 0;
+  }
+  .accounts-stat-icon {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 10px !important;
+  }
+  .accounts-stat-body { min-width: 0; }
+  .accounts-stat-value { font-size: 1.4rem !important; }
+  .accounts-stat-label {
+    font-size: 0.6rem !important;
+    letter-spacing: 0.06em !important;
+  }
+
+  /* Toolbar: search full-width on top, filters below */
+  .accounts-toolbar {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+  .accounts-search { width: 100%; }
+  .accounts-filters {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px !important;
+  }
+  .accounts-filters button {
+    width: 100%;
+    padding: 10px 8px !important;
+    font-size: 0.78rem !important;
+  }
+
+  /* Account cards: tighter, cleaner stacking */
+  .account-list-row {
+    gap: 14px !important;
+    padding: 16px !important;
+    border-radius: 18px !important;
+  }
+
+  /* Top section: avatar + name + sub */
+  .account-list-row .account-main {
+    gap: 14px !important;
+  }
+
+  /* Contact rows: add subtle divider above */
+  .account-list-row .account-contact {
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  /* Docs: compact chips row, left-aligned */
+  .account-list-row .account-docs {
+    width: auto !important;
+    flex: 0 0 auto !important;
+    align-self: flex-start;
+    order: 1;
+    gap: 6px !important;
+  }
+
+  /* Status: compact pill, left-aligned */
+  .account-list-row .account-status-cell {
+    width: auto !important;
+    flex: 0 0 auto !important;
+    align-self: flex-start;
+    order: 2;
+  }
+
+  /* Actions row: equal buttons, full width, clear CTA */
+  .account-list-row .account-actions {
+    order: 3;
+    display: grid !important;
+    grid-template-columns: 44px 44px 1fr;
+    gap: 8px !important;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    flex-wrap: nowrap !important;
+  }
+  .account-list-row .account-actions > * {
+    width: 100% !important;
+    min-width: 0;
+    height: 42px;
+  }
+  .account-list-row .account-actions .btn.small {
+    width: 100% !important;
+    padding: 0 !important;
+    height: 42px;
+    border-radius: 12px !important;
+  }
+  .account-list-row .account-actions > a {
+    justify-content: center;
+    padding: 0 14px !important;
+    font-size: 0.85rem !important;
+    height: 42px;
+  }
+
   /* --- Tables & assets grids --- */
   .assets-grid-xl { grid-template-columns: 1fr !important; gap: 14px; }
   .preview-modal-content { max-width: 100vw; width: 100vw; max-height: 100vh; border-radius: 0; }
@@ -6209,6 +6345,16 @@ input:focus, select:focus, textarea:focus {
   .step-circle { width: 34px; height: 34px; font-size: 0.85rem; }
   .logo-text { font-size: 1.1rem; }
   .stat-value { font-size: 1.25rem; }
+
+  /* Accounts page tweaks for small phones */
+  .accounts-page-header .accounts-page-header-text h1 { font-size: 1.55rem !important; }
+  .accounts-page-header .accounts-page-header-text p { font-size: 0.85rem !important; }
+  .accounts-stats { gap: 8px !important; }
+  .accounts-stat-card { padding: 12px 10px !important; gap: 8px !important; }
+  .accounts-stat-icon { width: 28px !important; height: 28px !important; border-radius: 9px !important; }
+  .accounts-stat-value { font-size: 1.2rem !important; }
+  .accounts-stat-label { font-size: 0.55rem !important; }
+  .accounts-filters button { padding: 9px 6px !important; font-size: 0.72rem !important; }
 }
 
 /* Prevent unwanted horizontal scroll on every page */

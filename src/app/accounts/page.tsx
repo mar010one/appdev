@@ -18,8 +18,8 @@ export default async function AccountsPage() {
 
   return (
     <div className="page-container">
-      <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '40px' }}>
-        <div>
+      <header className="page-header accounts-page-header">
+        <div className="accounts-page-header-text">
           <h1 style={{ fontSize: '2.5rem', fontWeight: 800 }}>Client Accounts</h1>
           <p className="text-muted" style={{ fontSize: '1.1rem' }}>Manage your high-level developer credentials and verification documents.</p>
         </div>

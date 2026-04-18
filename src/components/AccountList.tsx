@@ -68,9 +68,9 @@ export default function AccountList({ initialAccounts }: { initialAccounts: any[
     <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }} onClick={() => setOpenDropdown(null)}>
 
       {/* Stats bar */}
-      <div style={{ display: 'flex', gap: '14px' }}>
+      <div className="accounts-stats" style={{ display: 'flex', gap: '14px' }}>
         {statsData.map(s => (
-          <div key={s.label} style={{
+          <div key={s.label} className="accounts-stat-card" style={{
             flex: 1,
             background: `linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02))`,
             border: '1px solid rgba(255,255,255,0.08)',
@@ -81,7 +81,7 @@ export default function AccountList({ initialAccounts }: { initialAccounts: any[
             gap: '14px',
             boxShadow: `0 0 30px ${s.glow}`,
           }}>
-            <div style={{
+            <div className="accounts-stat-icon" style={{
               width: '40px', height: '40px', borderRadius: '12px',
               background: `${s.glow}`,
               border: `1px solid ${s.color}33`,
@@ -90,17 +90,17 @@ export default function AccountList({ initialAccounts }: { initialAccounts: any[
             }}>
               {s.icon}
             </div>
-            <div>
-              <div style={{ fontSize: '1.8rem', fontWeight: 800, lineHeight: 1, color: s.color }}>{s.value}</div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--muted)', marginTop: '3px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{s.label}</div>
+            <div className="accounts-stat-body">
+              <div className="accounts-stat-value" style={{ fontSize: '1.8rem', fontWeight: 800, lineHeight: 1, color: s.color }}>{s.value}</div>
+              <div className="accounts-stat-label" style={{ fontSize: '0.7rem', color: 'var(--muted)', marginTop: '3px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{s.label}</div>
             </div>
           </div>
         ))}
       </div>
 
       {/* Search + filters */}
-      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-        <div style={{ flex: 1, position: 'relative' }}>
+      <div className="accounts-toolbar" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <div className="accounts-search" style={{ flex: 1, position: 'relative' }}>
           <Search size={15} style={{
             position: 'absolute', left: '16px', top: '50%',
             transform: 'translateY(-50%)', color: 'var(--muted)', pointerEvents: 'none',
@@ -128,7 +128,7 @@ export default function AccountList({ initialAccounts }: { initialAccounts: any[
           />
         </div>
 
-        <div style={{ display: 'flex', gap: '6px' }}>
+        <div className="accounts-filters" style={{ display: 'flex', gap: '6px' }}>
           {(['all', 'active', 'closed'] as StatusFilter[]).map(f => {
             const active = statusFilter === f;
             const bg = f === 'all' ? 'var(--accent)' : f === 'active' ? '#22c55e' : '#ef4444';
@@ -220,7 +220,7 @@ export default function AccountList({ initialAccounts }: { initialAccounts: any[
             }}
           >
             {/* Developer Client */}
-            <Link href={`/accounts/${acc.id}`} style={{
+            <Link href={`/accounts/${acc.id}`} className="account-main" style={{
               display: 'flex', alignItems: 'center', gap: '12px',
               color: 'inherit', textDecoration: 'none', minWidth: 0,
             }}>
@@ -253,7 +253,7 @@ export default function AccountList({ initialAccounts }: { initialAccounts: any[
             </Link>
 
             {/* Contact */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
+            <div className="account-contact" style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '0.8rem', minWidth: 0 }}>
                 <Mail size={12} style={{ color: 'var(--muted)', flexShrink: 0 }} />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{acc.email}</span>
@@ -269,7 +269,7 @@ export default function AccountList({ initialAccounts }: { initialAccounts: any[
             </div>
 
             {/* Documents */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+            <div className="account-docs" style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
               {acc.documents?.length > 0
                 ? acc.documents.slice(0, 2).map((doc: any, i: number) => (
                     <PreviewModal
@@ -287,7 +287,7 @@ export default function AccountList({ initialAccounts }: { initialAccounts: any[
             </div>
 
             {/* Status — inline dropdown */}
-            <div style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
+            <div className="account-status-cell" style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
               <button
                 onClick={() => setOpenDropdown(openDropdown === acc.id ? null : acc.id)}
                 disabled={updatingId === acc.id}
@@ -371,7 +371,7 @@ export default function AccountList({ initialAccounts }: { initialAccounts: any[
             </div>
 
             {/* Actions */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '7px', alignItems: 'center' }}>
+            <div className="account-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '7px', alignItems: 'center' }}>
               <EditAccountModal account={acc} onUpdate={handleAccountUpdate} />
               <button
                 onClick={() => handleDelete(acc.id, acc.developer_name)}
