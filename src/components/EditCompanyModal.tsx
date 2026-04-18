@@ -15,6 +15,8 @@ import {
   Upload,
   X,
   XCircle,
+  Zap,
+  ZapOff,
 } from 'lucide-react';
 import ModalPortal from './ModalPortal';
 import { updateCompany, deleteCompanyDocument } from '@/lib/actions';
@@ -32,11 +34,13 @@ export default function EditCompanyModal({ company, accounts }: { company: any; 
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [hasId, setHasId] = useState(!!company.has_id);
+  const [companyStatus, setCompanyStatus] = useState<'used' | 'not_used'>(company.status || 'not_used');
   const [fileCounts, setFileCounts] = useState<Record<string, number>>({});
   const [localDocs, setLocalDocs] = useState<CompanyDoc[]>(company.documents ?? []);
 
   function handleOpen() {
     setHasId(!!company.has_id);
+    setCompanyStatus(company.status || 'not_used');
     setFileCounts({});
     setLocalDocs(company.documents ?? []);
     setIsOpen(true);
@@ -57,6 +61,7 @@ export default function EditCompanyModal({ company, accounts }: { company: any; 
     setIsPending(true);
     const fd = new FormData(e.currentTarget);
     fd.set('hasId', hasId ? '1' : '0');
+    fd.set('companyStatus', companyStatus);
     const result = await updateCompany(company.id, fd);
     setIsPending(false);
     if (result.success) {
@@ -113,6 +118,46 @@ export default function EditCompanyModal({ company, accounts }: { company: any; 
                       <Building2 size={20} />
                       <input type="text" name="name" defaultValue={company.name} required />
                     </div>
+                  </div>
+
+                  {/* ── Google Play Usage Status ── */}
+                  <div className="input-field">
+                    <label>Google Play Usage Status</label>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setCompanyStatus('used')}
+                        style={{
+                          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                          padding: '11px 16px', borderRadius: '14px', cursor: 'pointer', fontFamily: 'inherit',
+                          fontSize: '0.88rem', fontWeight: 700, transition: 'all 0.2s',
+                          border: companyStatus === 'used' ? '1.5px solid rgba(34,197,94,0.5)' : '1.5px solid var(--card-border)',
+                          background: companyStatus === 'used' ? 'rgba(34,197,94,0.12)' : 'var(--glass)',
+                          color: companyStatus === 'used' ? '#22c55e' : 'var(--muted)',
+                        }}
+                      >
+                        <Zap size={15} />
+                        Used
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCompanyStatus('not_used')}
+                        style={{
+                          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                          padding: '11px 16px', borderRadius: '14px', cursor: 'pointer', fontFamily: 'inherit',
+                          fontSize: '0.88rem', fontWeight: 700, transition: 'all 0.2s',
+                          border: companyStatus === 'not_used' ? '1.5px solid rgba(156,163,175,0.4)' : '1.5px solid var(--card-border)',
+                          background: companyStatus === 'not_used' ? 'rgba(156,163,175,0.08)' : 'var(--glass)',
+                          color: companyStatus === 'not_used' ? '#9ca3af' : 'var(--muted)',
+                        }}
+                      >
+                        <ZapOff size={15} />
+                        Not Used
+                      </button>
+                    </div>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '6px' }}>
+                      Mark as <strong>Used</strong> when this company was used to open a Google Play developer account.
+                    </p>
                   </div>
 
                   <div className="input-field">

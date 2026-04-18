@@ -8,7 +8,7 @@ import {
   ChevronRight, ChevronLeft, Check,
   User, Image as ImageIcon, Mail, ShieldCheck, Link as LinkIcon,
   Minus, Tag, BadgeCheck, Wand2, RefreshCw,
-  Package, Upload
+  Package, Upload, AlertCircle, Layers
 } from 'lucide-react';
 import { addApp, generateAppDescriptions, generateDescriptionField } from '@/lib/actions';
 import ModalPortal from './ModalPortal';
@@ -79,6 +79,8 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
   const [screenshotPreviews, setScreenshotPreviews] = useState<string[]>([]);
   const [screenshotFiles, setScreenshotFiles] = useState<File[]>([]);
   const [aabFile, setAabFile] = useState<File | null>(null);
+  const [iconError, setIconError] = useState<string | null>(null);
+  const [promoError, setPromoError] = useState<string | null>(null);
 
   const selectedAccount = useMemo(
     () => accounts.find(a => String(a.id) === String(selectedAccountId)),
@@ -239,22 +241,58 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
     setScreenshotPreviews([]);
     setScreenshotFiles([]);
     setAabFile(null);
+    setIconError(null);
+    setPromoError(null);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'icon' | 'promo' | 'screenshots') => {
+  function checkImageDimensions(file: File, w: number, h: number): Promise<string | null> {
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        if (img.naturalWidth !== w || img.naturalHeight !== h) {
+          resolve(`Must be exactly ${w}×${h}px — uploaded image is ${img.naturalWidth}×${img.naturalHeight}px.`);
+        } else {
+          resolve(null);
+        }
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+      img.src = url;
+    });
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'icon' | 'promo' | 'screenshots') => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     if (type === 'icon') {
+      const err = await checkImageDimensions(files[0], 512, 512);
+      if (err) {
+        setIconError(err);
+        setIconFile(null);
+        setIconPreview(null);
+        e.target.value = '';
+        return;
+      }
+      setIconError(null);
       setIconFile(files[0]);
       setIconPreview(URL.createObjectURL(files[0]));
     } else if (type === 'promo') {
+      const err = await checkImageDimensions(files[0], 1024, 500);
+      if (err) {
+        setPromoError(err);
+        setPromoFile(null);
+        setPromoPreview(null);
+        e.target.value = '';
+        return;
+      }
+      setPromoError(null);
       setPromoFile(files[0]);
       setPromoPreview(URL.createObjectURL(files[0]));
     } else if (type === 'screenshots') {
       const newFiles = Array.from(files);
       const newPreviews = newFiles.map(file => URL.createObjectURL(file));
-
       setScreenshotFiles(prev => [...prev, ...newFiles].slice(0, 8));
       setScreenshotPreviews(prev => [...prev, ...newPreviews].slice(0, 8));
     }
@@ -272,12 +310,19 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
     4: 'Contact & Compliance',
   };
 
+  const stepIcons = [
+    <User key={1} size={20} />,
+    <Layers key={2} size={20} />,
+    <ImageIcon key={3} size={20} />,
+    <ShieldCheck key={4} size={20} />,
+  ];
+
   const StepIndicator = () => (
     <div className="stepper-container">
       {[1, 2, 3, 4].map((s) => (
         <div key={s} className={`step-item ${step === s ? 'active' : ''} ${step > s ? 'completed' : ''}`}>
           <div className="step-circle">
-            {step > s ? <Check size={16} /> : s}
+            {step > s ? <Check size={18} /> : step === s ? stepIcons[s - 1] : s}
           </div>
           <span className="step-label">{stepLabels[s]}</span>
           {s < TOTAL_STEPS && <div className="step-line" />}
@@ -673,34 +718,78 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
                   <div className="assets-layout-grid">
                     {/* Top Row: Icon and Promo */}
                     <div className="assets-grid-xl">
-                      <div className={`asset-upload-card ${iconPreview ? 'has-preview' : ''}`}>
-                        <div className="asset-info">
-                          <strong>Store Icon</strong>
-                          <span>512x512 PNG/JPG</span>
+                      {/* Store Icon */}
+                      <div className={`asset-upload-card ${iconPreview ? 'has-preview' : ''} ${iconError ? 'has-error' : ''}`}>
+                        <div className="asset-card-header">
+                          <div className="asset-info">
+                            <strong>Store Icon</strong>
+                            <div className="asset-dim-badge">
+                              <span className="dim-required">512 × 512</span>
+                              <span>PNG / JPG</span>
+                            </div>
+                          </div>
+                          {iconPreview && !iconError && (
+                            <span className="asset-status-ok"><Check size={12} /> OK</span>
+                          )}
                         </div>
-                        <div className="file-upload-xl">
+                        <label className="file-upload-xl" style={{ cursor: 'pointer' }}>
                           {iconPreview ? (
-                            <img src={iconPreview} alt="Icon Preview" className="asset-preview-img" />
+                            <>
+                              <img src={iconPreview} alt="Icon Preview" className="asset-preview-img" />
+                              <span className="asset-replace-hint"><Upload size={14} /> Replace</span>
+                            </>
                           ) : (
-                            <><FileImage size={48} /><p>Upload Icon</p></>
+                            <>
+                              <div className="asset-upload-icon"><FileImage size={36} /></div>
+                              <p className="asset-upload-label">Click to upload</p>
+                              <p className="asset-upload-hint">Exact 512×512px required</p>
+                            </>
                           )}
                           <input type="file" name="iconSmall" accept="image/*" className="hidden-input" onChange={(e) => handleFileChange(e, 'icon')} />
-                        </div>
+                        </label>
+                        {iconError && (
+                          <div className="asset-error-msg">
+                            <AlertCircle size={14} />
+                            <span>{iconError}</span>
+                          </div>
+                        )}
                       </div>
 
-                      <div className={`asset-upload-card ${promoPreview ? 'has-preview' : ''}`}>
-                        <div className="asset-info">
-                          <strong>Promo Graphic</strong>
-                          <span>1024x500 Feature Graphic</span>
+                      {/* Feature Graphic */}
+                      <div className={`asset-upload-card ${promoPreview ? 'has-preview' : ''} ${promoError ? 'has-error' : ''}`}>
+                        <div className="asset-card-header">
+                          <div className="asset-info">
+                            <strong>Feature Graphic</strong>
+                            <div className="asset-dim-badge">
+                              <span className="dim-required">1024 × 500</span>
+                              <span>PNG / JPG</span>
+                            </div>
+                          </div>
+                          {promoPreview && !promoError && (
+                            <span className="asset-status-ok"><Check size={12} /> OK</span>
+                          )}
                         </div>
-                        <div className="file-upload-xl">
+                        <label className="file-upload-xl" style={{ cursor: 'pointer' }}>
                           {promoPreview ? (
-                            <img src={promoPreview} alt="Promo Preview" className="asset-preview-img" />
+                            <>
+                              <img src={promoPreview} alt="Promo Preview" className="asset-preview-img" />
+                              <span className="asset-replace-hint"><Upload size={14} /> Replace</span>
+                            </>
                           ) : (
-                            <><ImageIcon size={48} /><p>Upload Promo</p></>
+                            <>
+                              <div className="asset-upload-icon"><ImageIcon size={36} /></div>
+                              <p className="asset-upload-label">Click to upload</p>
+                              <p className="asset-upload-hint">Exact 1024×500px required</p>
+                            </>
                           )}
                           <input type="file" name="iconLarge" accept="image/*" className="hidden-input" onChange={(e) => handleFileChange(e, 'promo')} />
-                        </div>
+                        </label>
+                        {promoError && (
+                          <div className="asset-error-msg">
+                            <AlertCircle size={14} />
+                            <span>{promoError}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 

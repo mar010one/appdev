@@ -18,6 +18,8 @@ import {
   Trash2,
   X,
   XCircle,
+  Zap,
+  ZapOff,
 } from 'lucide-react';
 import ModalPortal from '@/components/ModalPortal';
 import EditCompanyModal from '@/components/EditCompanyModal';
@@ -31,6 +33,7 @@ type Company = {
   duns?: string;
   ded?: string;
   has_id: number;
+  status?: string;
   linked_account_id?: number;
   account_name?: string;
   notes?: string;
@@ -194,23 +197,22 @@ export default function CompaniesView({
                     </div>
                     <div>
                       <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>{co.name}</h3>
-                      <span
-                        style={{
-                          fontSize: '0.7rem',
-                          fontWeight: 700,
-                          color: co.has_id ? '#22c55e' : '#f59e0b',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '3px',
-                          marginTop: '3px',
-                        }}
-                      >
-                        {co.has_id ? (
-                          <><CheckCircle2 size={11} /> ID in hand</>
-                        ) : (
-                          <><AlertCircle size={11} /> ID not collected</>
-                        )}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 700, color: co.has_id ? '#22c55e' : '#f59e0b', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          {co.has_id ? <><CheckCircle2 size={11} /> ID in hand</> : <><AlertCircle size={11} /> ID not collected</>}
+                        </span>
+                        <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.65rem' }}>·</span>
+                        <span style={{
+                          fontSize: '0.68rem', fontWeight: 700,
+                          display: 'inline-flex', alignItems: 'center', gap: '3px',
+                          color: co.status === 'used' ? '#22c55e' : '#6b7280',
+                        }}>
+                          {co.status === 'used'
+                            ? <><Zap size={10} /> Used</>
+                            : <><ZapOff size={10} /> Not Used</>
+                          }
+                        </span>
+                      </div>
                     </div>
                   </div>
 

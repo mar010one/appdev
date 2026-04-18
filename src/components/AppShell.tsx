@@ -1,6 +1,6 @@
 'use client';
 
-import { Building2, LayoutDashboard, LogOut, Settings, Smartphone, Users, Wallet } from 'lucide-react';
+import { BookOpen, Building2, ClipboardList, LayoutDashboard, LogOut, Settings, Smartphone, Users, Wallet } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { ReactNode, useEffect, useState } from 'react';
@@ -85,6 +85,14 @@ export default function AppShell({ children }: { children: ReactNode }) {
               <span>Charges</span>
             </Link>
           )}
+          <Link href="/missions" className={`nav-item ${pathname.startsWith('/missions') ? 'active' : ''}`}>
+            <ClipboardList size={20} />
+            <span>Missions</span>
+          </Link>
+          <Link href="/tutorials" className={`nav-item ${pathname.startsWith('/tutorials') ? 'active' : ''}`}>
+            <BookOpen size={20} />
+            <span>Tutorials</span>
+          </Link>
         </nav>
 
         <div className="sidebar-footer">

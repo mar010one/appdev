@@ -19,6 +19,7 @@ async function ensureDirs() {
     join(process.cwd(), 'public', 'uploads', 'screenshots'),
     join(process.cwd(), 'public', 'uploads', 'versions'),
     join(process.cwd(), 'public', 'uploads', 'companies'),
+    join(process.cwd(), 'public', 'uploads', 'tutorials'),
   ];
   for (const dir of dirs) {
     await mkdir(dir, { recursive: true });
@@ -51,6 +52,7 @@ export async function getAccountById(id: number) {
   const account = db.prepare('SELECT * FROM accounts WHERE id = ?').get(id) as any;
   if (!account) return null;
   account.documents = db.prepare('SELECT * FROM account_documents WHERE account_id = ?').all(id);
+  account.linkedCompanies = db.prepare('SELECT id, name FROM companies WHERE linked_account_id = ? ORDER BY name ASC').all(id);
   return account;
 }
 
@@ -67,14 +69,21 @@ export async function addAccount(formData: FormData): Promise<ActionResponse> {
     const devPassword = formData.get('devPassword')?.toString() || '';
     const dev2faSecret = formData.get('dev2faSecret')?.toString() || '';
     const devSecurityNotes = formData.get('devSecurityNotes')?.toString() || '';
+    const vccNumber = formData.get('vccNumber')?.toString() || '';
+    const vccHolder = formData.get('vccHolder')?.toString() || '';
+    const vccExpiry = formData.get('vccExpiry')?.toString() || '';
+    const vccCvv = formData.get('vccCvv')?.toString() || '';
+    const vccNotes = formData.get('vccNotes')?.toString() || '';
     const documents = formData.getAll('documents'); // Multiple files
 
     const result = db.prepare(`
       INSERT INTO accounts (type, developer_name, developer_id, email, website, phone,
-                            company_name, dev_password, dev_2fa_secret, dev_security_notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            company_name, dev_password, dev_2fa_secret, dev_security_notes,
+                            vcc_number, vcc_holder, vcc_expiry, vcc_cvv, vcc_notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(type, developerName, developerId, email, website, phone,
-           companyName, devPassword, dev2faSecret, devSecurityNotes);
+           companyName, devPassword, dev2faSecret, devSecurityNotes,
+           vccNumber, vccHolder, vccExpiry, vccCvv, vccNotes);
     
     const accountId = result.lastInsertRowid;
 
@@ -478,14 +487,21 @@ export async function updateAccount(id: number, formData: FormData) {
     const devPassword = formData.get('devPassword')?.toString() || '';
     const dev2faSecret = formData.get('dev2faSecret')?.toString() || '';
     const devSecurityNotes = formData.get('devSecurityNotes')?.toString() || '';
+    const vccNumber = formData.get('vccNumber')?.toString() || '';
+    const vccHolder = formData.get('vccHolder')?.toString() || '';
+    const vccExpiry = formData.get('vccExpiry')?.toString() || '';
+    const vccCvv = formData.get('vccCvv')?.toString() || '';
+    const vccNotes = formData.get('vccNotes')?.toString() || '';
 
     db.prepare(`
       UPDATE accounts
       SET developer_name = ?, developer_id = ?, email = ?, website = ?, phone = ?, status = ?,
-          company_name = ?, dev_password = ?, dev_2fa_secret = ?, dev_security_notes = ?
+          company_name = ?, dev_password = ?, dev_2fa_secret = ?, dev_security_notes = ?,
+          vcc_number = ?, vcc_holder = ?, vcc_expiry = ?, vcc_cvv = ?, vcc_notes = ?
       WHERE id = ?
     `).run(developerName, developerId, email, website, phone, status,
-           companyName, devPassword, dev2faSecret, devSecurityNotes, id);
+           companyName, devPassword, dev2faSecret, devSecurityNotes,
+           vccNumber, vccHolder, vccExpiry, vccCvv, vccNotes, id);
 
     // When account is closed, automatically close all its apps
     if (status === 'closed') {
@@ -1104,6 +1120,7 @@ export async function addCompany(formData: FormData): Promise<ActionResponse> {
     await saveMultiDocs(formData, 'otherDoc',   companyId, 'other',       'other-');
 
     revalidatePath('/companies');
+    revalidatePath('/accounts');
     return { success: true };
   } catch (error) {
     console.error('Error in addCompany:', error);
@@ -1121,15 +1138,16 @@ export async function updateCompany(id: number, formData: FormData): Promise<Act
     const hasId   = formData.get('hasId') === '1' ? 1 : 0;
     const linkedAccountId = formData.get('linkedAccountId')?.toString() || null;
     const notes   = formData.get('notes')?.toString() || '';
+    const status  = formData.get('companyStatus')?.toString() || 'not_used';
 
     if (!db.prepare('SELECT id FROM companies WHERE id = ?').get(id)) {
       return { error: 'Company not found.' };
     }
 
     db.prepare(`
-      UPDATE companies SET name=?, ice=?, duns=?, ded=?, has_id=?, linked_account_id=?, notes=?
+      UPDATE companies SET name=?, ice=?, duns=?, ded=?, has_id=?, linked_account_id=?, notes=?, status=?
       WHERE id=?
-    `).run(name, ice, duns, ded, hasId, linkedAccountId || null, notes, id);
+    `).run(name, ice, duns, ded, hasId, linkedAccountId || null, notes, status, id);
 
     // Append any new uploads — existing docs stay untouched
     await saveMultiDocs(formData, 'idFront',    id, 'id_front',    'id-front-');
@@ -1156,6 +1174,48 @@ export async function deleteCompanyDocument(docId: number): Promise<ActionRespon
     return { success: true };
   } catch (error) {
     console.error('Error in deleteCompanyDocument:', error);
+    return { error: (error as Error).message };
+  }
+}
+
+export async function linkCompanyToAccount(companyId: number, accountId: number): Promise<ActionResponse> {
+  try {
+    db.prepare('UPDATE companies SET linked_account_id = ? WHERE id = ?').run(accountId, companyId);
+    revalidatePath('/companies');
+    revalidatePath(`/accounts/${accountId}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Error in linkCompanyToAccount:', error);
+    return { error: (error as Error).message };
+  }
+}
+
+export async function addCompanyQuick(name: string, linkedAccountId: number): Promise<ActionResponse<{ id: number; name: string }>> {
+  try {
+    if (!name.trim()) return { error: 'Company name is required.' };
+    const result = db.prepare(
+      'INSERT INTO companies (name, linked_account_id) VALUES (?, ?)',
+    ).run(name.trim(), linkedAccountId);
+    revalidatePath('/companies');
+    revalidatePath('/accounts');
+    revalidatePath(`/accounts/${linkedAccountId}`);
+    return { success: true, data: { id: Number(result.lastInsertRowid), name: name.trim() } };
+  } catch (error) {
+    console.error('Error in addCompanyQuick:', error);
+    return { error: (error as Error).message };
+  }
+}
+
+/** Create a company with just a name (no linked account yet). Used from account creation flow. */
+export async function addCompanyName(name: string): Promise<ActionResponse<{ id: number; name: string }>> {
+  try {
+    if (!name.trim()) return { error: 'Company name is required.' };
+    const result = db.prepare('INSERT INTO companies (name) VALUES (?)').run(name.trim());
+    revalidatePath('/companies');
+    revalidatePath('/accounts');
+    return { success: true, data: { id: Number(result.lastInsertRowid), name: name.trim() } };
+  } catch (error) {
+    console.error('Error in addCompanyName:', error);
     return { error: (error as Error).message };
   }
 }
@@ -1251,4 +1311,150 @@ export async function getExpenseSummary(): Promise<ExpenseSummary> {
     settlementMAD,
     settlementUSD: settlementMAD / rate,
   };
+}
+
+// ─── Tutorials ──────────────────────────────────────────────────────────────
+
+export async function getTutorials() {
+  return db.prepare('SELECT * FROM tutorials ORDER BY created_at DESC').all();
+}
+
+export async function addTutorial(formData: FormData): Promise<ActionResponse> {
+  try {
+    await ensureDirs();
+    const title = formData.get('title')?.toString() || '';
+    const description = formData.get('description')?.toString() || '';
+    const type = formData.get('type')?.toString() || 'link';
+    const category = formData.get('category')?.toString() || '';
+    const url = formData.get('url')?.toString() || '';
+    const file = formData.get('file') as any;
+
+    let filePath = '';
+    let fileName = '';
+    if (type === 'upload' && file?.size) {
+      filePath = await saveUploadedFile(file, 'tutorials');
+      fileName = file.name || '';
+    }
+
+    db.prepare(`
+      INSERT INTO tutorials (title, description, type, file_path, file_name, url, category)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(title, description, type, filePath, fileName, url, category);
+
+    revalidatePath('/tutorials');
+    return { success: true };
+  } catch (error: any) {
+    return { error: error.message };
+  }
+}
+
+export async function deleteTutorial(id: number): Promise<ActionResponse> {
+  try {
+    const tutorial = db.prepare('SELECT * FROM tutorials WHERE id = ?').get(id) as any;
+    if (tutorial?.file_path) {
+      try {
+        await unlink(join(process.cwd(), 'public', tutorial.file_path));
+      } catch {}
+    }
+    db.prepare('DELETE FROM tutorials WHERE id = ?').run(id);
+    revalidatePath('/tutorials');
+    return { success: true };
+  } catch (error: any) {
+    return { error: error.message };
+  }
+}
+
+// ─── Missions ────────────────────────────────────────────────────────────────
+
+export type MissionStatus = 'pending' | 'done';
+export type MissionPriority = 'low' | 'normal' | 'high';
+
+export type Mission = {
+  id: number;
+  title: string;
+  description: string | null;
+  assigned_to: string | null;
+  due_date: string;
+  status: MissionStatus;
+  priority: MissionPriority;
+  created_by: string | null;
+  created_at: string;
+};
+
+export async function getMissions(date?: string): Promise<Mission[]> {
+  if (date) {
+    return db.prepare(
+      'SELECT * FROM missions WHERE due_date = ? ORDER BY priority DESC, created_at ASC'
+    ).all(date) as Mission[];
+  }
+  return db.prepare(
+    'SELECT * FROM missions ORDER BY due_date ASC, priority DESC, created_at ASC'
+  ).all() as Mission[];
+}
+
+export async function addMission(formData: FormData): Promise<ActionResponse> {
+  try {
+    const title = formData.get('title')?.toString().trim() || '';
+    if (!title) return { error: 'Title is required.' };
+    const description = formData.get('description')?.toString() || '';
+    const assigned_to = formData.get('assigned_to')?.toString() || '';
+    const due_date = formData.get('due_date')?.toString() || '';
+    if (!due_date) return { error: 'Due date is required.' };
+    const priority = (formData.get('priority')?.toString() || 'normal') as MissionPriority;
+    const created_by = formData.get('created_by')?.toString() || '';
+
+    db.prepare(`
+      INSERT INTO missions (title, description, assigned_to, due_date, status, priority, created_by)
+      VALUES (?, ?, ?, ?, 'pending', ?, ?)
+    `).run(title, description, assigned_to, due_date, priority, created_by);
+
+    revalidatePath('/missions');
+    return { success: true };
+  } catch (error: any) {
+    return { error: error.message };
+  }
+}
+
+export async function toggleMission(id: number): Promise<ActionResponse> {
+  try {
+    const mission = db.prepare('SELECT status FROM missions WHERE id = ?').get(id) as Mission | undefined;
+    if (!mission) return { error: 'Mission not found.' };
+    const next = mission.status === 'done' ? 'pending' : 'done';
+    db.prepare('UPDATE missions SET status = ? WHERE id = ?').run(next, id);
+    revalidatePath('/missions');
+    return { success: true };
+  } catch (error: any) {
+    return { error: error.message };
+  }
+}
+
+export async function deleteMission(id: number): Promise<ActionResponse> {
+  try {
+    db.prepare('DELETE FROM missions WHERE id = ?').run(id);
+    revalidatePath('/missions');
+    return { success: true };
+  } catch (error: any) {
+    return { error: error.message };
+  }
+}
+
+export async function updateMission(id: number, formData: FormData): Promise<ActionResponse> {
+  try {
+    const title = formData.get('title')?.toString().trim() || '';
+    if (!title) return { error: 'Title is required.' };
+    const description = formData.get('description')?.toString() || '';
+    const assigned_to = formData.get('assigned_to')?.toString() || '';
+    const due_date = formData.get('due_date')?.toString() || '';
+    if (!due_date) return { error: 'Due date is required.' };
+    const priority = (formData.get('priority')?.toString() || 'normal') as MissionPriority;
+
+    db.prepare(`
+      UPDATE missions SET title=?, description=?, assigned_to=?, due_date=?, priority=? WHERE id=?
+    `).run(title, description, assigned_to, due_date, priority, id);
+
+    revalidatePath('/missions');
+    return { success: true };
+  } catch (error: any) {
+    return { error: error.message };
+  }
 }

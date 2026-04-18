@@ -139,6 +139,30 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
   );
+
+  CREATE TABLE IF NOT EXISTS tutorials (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    description TEXT,
+    type TEXT NOT NULL DEFAULT 'link',
+    file_path TEXT,
+    file_name TEXT,
+    url TEXT,
+    category TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS missions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    description TEXT,
+    assigned_to TEXT,
+    due_date TEXT NOT NULL,
+    status TEXT DEFAULT 'pending',
+    priority TEXT DEFAULT 'normal',
+    created_by TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 // Seed a default USD->MAD rate if none exists yet.
@@ -175,5 +199,15 @@ ensureColumn('versions', 'promo_path', 'TEXT');
 
 // Listing version may optionally link to a binary release's AAB / IPA
 ensureColumn('listing_versions', 'release_file_path', 'TEXT');
+
+// VCC (Virtual Credit Card) used for opening Google Play developer accounts
+ensureColumn('accounts', 'vcc_number', 'TEXT');
+ensureColumn('accounts', 'vcc_holder', 'TEXT');
+ensureColumn('accounts', 'vcc_expiry', 'TEXT');
+ensureColumn('accounts', 'vcc_cvv', 'TEXT');
+ensureColumn('accounts', 'vcc_notes', 'TEXT');
+
+// Company usage status: not_used | used (tracks if company was used to open a Google Play account)
+ensureColumn('companies', 'status', "TEXT DEFAULT 'not_used'");
 
 export default db;

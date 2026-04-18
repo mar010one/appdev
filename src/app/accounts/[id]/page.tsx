@@ -1,4 +1,4 @@
-import { getAccountById, getApps } from '@/lib/actions';
+import { getAccountById, getApps, getCompanies } from '@/lib/actions';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Mail, Globe, Phone, Hash, Smartphone, ShieldCheck, ShieldAlert, Building2 } from 'lucide-react';
@@ -15,7 +15,10 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
   const account = await getAccountById(accountId);
   if (!account) return notFound();
 
-  const apps = (await getApps(accountId)) as any[];
+  const [apps, allCompanies] = await Promise.all([
+    getApps(accountId) as Promise<any[]>,
+    getCompanies(),
+  ]);
 
   const platformLabel = account.type === 'google_play' ? 'Google Play Console' : 'App Store Connect';
   const platformInitial = account.type === 'google_play' ? 'G' : 'A';
@@ -58,7 +61,7 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
           </div>
         </div>
         <div className="account-hero-actions">
-          <EditAccountModal account={account} />
+          <EditAccountModal account={account} allCompanies={allCompanies} />
           <CreateAppModal accounts={[account]} />
         </div>
       </header>
