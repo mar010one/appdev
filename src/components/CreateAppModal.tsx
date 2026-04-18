@@ -11,6 +11,7 @@ import {
   Package, Upload, AlertCircle, Layers
 } from 'lucide-react';
 import { addApp, generateAppDescriptions, generateDescriptionField } from '@/lib/actions';
+import { uploadFilesInForm } from '@/lib/upload-client';
 import ModalPortal from './ModalPortal';
 
 type Account = {
@@ -221,6 +222,26 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
     screenshotFiles.forEach((file, index) => {
       formData.append(`screenshot_${index}`, file);
     });
+
+    try {
+      await uploadFilesInForm(formData, {
+        iconSmall: { bucket: 'icons', prefix: 'small-' },
+        iconLarge: { bucket: 'icons', prefix: 'large-' },
+        aabFile: { bucket: 'apps' },
+        screenshot_0: { bucket: 'screenshots', prefix: 'shot-0-' },
+        screenshot_1: { bucket: 'screenshots', prefix: 'shot-1-' },
+        screenshot_2: { bucket: 'screenshots', prefix: 'shot-2-' },
+        screenshot_3: { bucket: 'screenshots', prefix: 'shot-3-' },
+        screenshot_4: { bucket: 'screenshots', prefix: 'shot-4-' },
+        screenshot_5: { bucket: 'screenshots', prefix: 'shot-5-' },
+        screenshot_6: { bucket: 'screenshots', prefix: 'shot-6-' },
+        screenshot_7: { bucket: 'screenshots', prefix: 'shot-7-' },
+      });
+    } catch (e: any) {
+      setIsPending(false);
+      alert(e?.message || 'File upload failed');
+      return;
+    }
 
     const result = await addApp(formData);
     setIsPending(false);

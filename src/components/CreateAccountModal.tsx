@@ -8,6 +8,7 @@ import {
   ChevronDown, Check, Loader2, Sparkles, CreditCard,
 } from 'lucide-react';
 import { addAccount, addCompanyName } from '@/lib/actions';
+import { uploadFilesInForm } from '@/lib/upload-client';
 import ModalPortal from './ModalPortal';
 
 function RevealInput({ name, placeholder }: { name: string; placeholder?: string }) {
@@ -104,6 +105,17 @@ export default function CreateAccountModal({ companies = [] }: { companies?: any
     formData.delete('documents');
     for (const file of files) formData.append('documents', file);
     formData.set('companyName', selectedCompany);
+
+    try {
+      await uploadFilesInForm(formData, {
+        documents: { bucket: 'documents' },
+      });
+    } catch (err: any) {
+      setIsPending(false);
+      alert(err?.message || 'File upload failed');
+      return;
+    }
+
     const result = await addAccount(formData);
     setIsPending(false);
     if (result.success) {

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Smartphone, Globe, Save, AlignLeft, Sparkles, Loader2, ChevronLeft, Image as ImageIcon, FileImage, Plus, Check, Trash2 } from 'lucide-react';
 import { updateApp, generateAppDescriptions, deleteScreenshot } from '@/lib/actions';
+import { uploadFilesInForm } from '@/lib/upload-client';
 import ModalPortal from './ModalPortal';
 
 export default function EditAppModal({ app }: { app: any }) {
@@ -48,7 +49,26 @@ export default function EditAppModal({ app }: { app: any }) {
     newScreenshotFiles.forEach((file, index) => {
       formData.append(`screenshot_${index}`, file);
     });
-    
+
+    try {
+      await uploadFilesInForm(formData, {
+        iconSmall: { bucket: 'icons', prefix: 'small-' },
+        iconLarge: { bucket: 'icons', prefix: 'large-' },
+        screenshot_0: { bucket: 'screenshots', prefix: 'shot-0-' },
+        screenshot_1: { bucket: 'screenshots', prefix: 'shot-1-' },
+        screenshot_2: { bucket: 'screenshots', prefix: 'shot-2-' },
+        screenshot_3: { bucket: 'screenshots', prefix: 'shot-3-' },
+        screenshot_4: { bucket: 'screenshots', prefix: 'shot-4-' },
+        screenshot_5: { bucket: 'screenshots', prefix: 'shot-5-' },
+        screenshot_6: { bucket: 'screenshots', prefix: 'shot-6-' },
+        screenshot_7: { bucket: 'screenshots', prefix: 'shot-7-' },
+      });
+    } catch (err: any) {
+      setIsPending(false);
+      alert(err?.message || 'File upload failed');
+      return;
+    }
+
     const result = await updateApp(app.id, formData);
     setIsPending(false);
     

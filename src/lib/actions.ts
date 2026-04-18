@@ -14,12 +14,15 @@ export type ActionResponse<T = any> = {
 // 100 MB — update this if your Supabase bucket limit is different
 const STORAGE_MAX_BYTES = 100 * 1024 * 1024;
 
-/** Upload a file to Supabase Storage and return its public URL. */
+/** Upload a file to Supabase Storage and return its public URL.
+ *  If `file` is already a URL string (uploaded from the browser to bypass
+ *  Vercel's 4.5 MB request-body cap), pass it through unchanged. */
 async function saveUploadedFile(
   file: any,
   bucket: string,
   prefix = '',
 ): Promise<string> {
+  if (typeof file === 'string') return file.trim();
   if (!file || !file.size || typeof file.arrayBuffer !== 'function') return '';
 
   if (file.size > STORAGE_MAX_BYTES) {
@@ -81,6 +84,18 @@ async function deleteFile(url?: string | null) {
   }
 }
 
+/** Resolve a File-or-URL entry's display name, falling back to a paired
+ *  `<fieldName>__filename` entry (added by the browser upload helper). */
+function resolveFileName(entry: any, pairedName: string, fallback: string): string {
+  if (entry && typeof entry !== 'string' && entry.name) return entry.name;
+  if (pairedName) return pairedName;
+  if (typeof entry === 'string' && entry) {
+    const tail = entry.split('?')[0].split('/').pop();
+    if (tail) return tail;
+  }
+  return fallback;
+}
+
 /** Upload multiple files from a single FormData field into a storage bucket. */
 async function saveMultiDocs(
   formData: FormData,
@@ -89,15 +104,28 @@ async function saveMultiDocs(
   docType: string,
   prefix: string,
 ) {
-  const files = formData.getAll(fieldName) as any[];
-  for (const file of files) {
-    if (!file || typeof file === 'string' || !file.size) continue;
-    const filePath = await saveUploadedFile(file, 'companies', prefix);
+  const entries = formData.getAll(fieldName) as any[];
+  const pairedNames = formData.getAll(`${fieldName}__filename`) as string[];
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    if (!entry) continue;
+    if (typeof entry === 'string') {
+      if (!entry.trim()) continue;
+      await supabase.from('company_documents').insert({
+        company_id: companyId,
+        file_path: entry,
+        file_name: resolveFileName(entry, pairedNames[i] || '', fieldName),
+        doc_type: docType,
+      });
+      continue;
+    }
+    if (!entry.size) continue;
+    const filePath = await saveUploadedFile(entry, 'companies', prefix);
     if (filePath) {
       await supabase.from('company_documents').insert({
         company_id: companyId,
         file_path: filePath,
-        file_name: file.name || fieldName,
+        file_name: entry.name || fieldName,
         doc_type: docType,
       });
     }
@@ -165,6 +193,7 @@ export async function addAccount(formData: FormData): Promise<ActionResponse> {
     const vccCvv = formData.get('vccCvv')?.toString() || '';
     const vccNotes = formData.get('vccNotes')?.toString() || '';
     const documents = formData.getAll('documents');
+    const documentNames = formData.getAll('documents__filename') as string[];
 
     const { data: account, error } = await supabase
       .from('accounts')
@@ -191,17 +220,26 @@ export async function addAccount(formData: FormData): Promise<ActionResponse> {
     if (error) throw error;
     const accountId = account.id;
 
-    for (const doc of documents) {
-      if (doc && typeof doc !== 'string' && (doc as any).size > 0) {
-        const file = doc as any;
-        const filePath = await saveUploadedFile(file, 'documents');
-        if (filePath) {
-          await supabase.from('account_documents').insert({
-            account_id: accountId,
-            file_path: filePath,
-            file_name: file.name,
-          });
-        }
+    for (let i = 0; i < documents.length; i++) {
+      const doc = documents[i] as any;
+      if (!doc) continue;
+      if (typeof doc === 'string') {
+        if (!doc.trim()) continue;
+        await supabase.from('account_documents').insert({
+          account_id: accountId,
+          file_path: doc,
+          file_name: resolveFileName(doc, documentNames[i] || '', 'document'),
+        });
+        continue;
+      }
+      if (!doc.size) continue;
+      const filePath = await saveUploadedFile(doc, 'documents');
+      if (filePath) {
+        await supabase.from('account_documents').insert({
+          account_id: accountId,
+          file_path: filePath,
+          file_name: doc.name,
+        });
       }
     }
 
@@ -638,17 +676,27 @@ export async function updateAccount(id: number, formData: FormData) {
     }
 
     const newDocs = formData.getAll('newDocuments');
-    for (const doc of newDocs) {
-      if (doc && typeof doc !== 'string' && (doc as any).size > 0) {
-        const file = doc as any;
-        const filePath = await saveUploadedFile(file, 'documents');
-        if (filePath) {
-          await supabase.from('account_documents').insert({
-            account_id: id,
-            file_path: filePath,
-            file_name: file.name,
-          });
-        }
+    const newDocNames = formData.getAll('newDocuments__filename') as string[];
+    for (let i = 0; i < newDocs.length; i++) {
+      const doc = newDocs[i] as any;
+      if (!doc) continue;
+      if (typeof doc === 'string') {
+        if (!doc.trim()) continue;
+        await supabase.from('account_documents').insert({
+          account_id: id,
+          file_path: doc,
+          file_name: resolveFileName(doc, newDocNames[i] || '', 'document'),
+        });
+        continue;
+      }
+      if (!doc.size) continue;
+      const filePath = await saveUploadedFile(doc, 'documents');
+      if (filePath) {
+        await supabase.from('account_documents').insert({
+          account_id: id,
+          file_path: filePath,
+          file_name: doc.name,
+        });
       }
     }
 
@@ -1462,7 +1510,13 @@ export async function addTutorial(formData: FormData): Promise<ActionResponse> {
     let fileName = '';
     if (type === 'upload') {
       const file = formData.get('file') as any;
-      if (file?.size) {
+      const pairedName = (formData.get('file__filename') as string) || '';
+      if (typeof file === 'string') {
+        if (file.trim()) {
+          filePath = file;
+          fileName = resolveFileName(file, pairedName, 'tutorial');
+        }
+      } else if (file?.size) {
         filePath = await saveUploadedFile(file, 'tutorials');
         fileName = file.name || '';
       }

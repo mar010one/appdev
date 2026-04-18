@@ -8,6 +8,7 @@ import {
   ChevronDown, Sparkles,
 } from 'lucide-react';
 import { updateAccount, deleteAccountDocument, addCompanyQuick, linkCompanyToAccount, addCompanyName } from '@/lib/actions';
+import { uploadFilesInForm } from '@/lib/upload-client';
 import ModalPortal from './ModalPortal';
 
 /* ─── Reveal/hide password input ──────────────────────────────────────────── */
@@ -192,6 +193,17 @@ export default function EditAccountModal({
     // Override companyName from picker state (hidden input carries it)
     fd.set('companyName', selectedCompany);
     for (const f of pendingFiles) fd.append('newDocuments', f);
+
+    try {
+      await uploadFilesInForm(fd, {
+        newDocuments: { bucket: 'documents' },
+      });
+    } catch (err: any) {
+      setIsPending(false);
+      alert(err?.message || 'File upload failed');
+      return;
+    }
+
     const result = await updateAccount(account.id, fd);
     setIsPending(false);
     if (result.success) {

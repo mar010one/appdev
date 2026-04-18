@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import ModalPortal from './ModalPortal';
 import { updateCompany, deleteCompanyDocument } from '@/lib/actions';
+import { uploadFilesInForm } from '@/lib/upload-client';
 
 type CompanyDoc = { id: number; file_path: string; file_name: string; doc_type: string };
 
@@ -62,6 +63,20 @@ export default function EditCompanyModal({ company, accounts }: { company: any; 
     const fd = new FormData(e.currentTarget);
     fd.set('hasId', hasId ? '1' : '0');
     fd.set('companyStatus', companyStatus);
+
+    try {
+      await uploadFilesInForm(fd, {
+        idFront: { bucket: 'companies', prefix: 'id-front-' },
+        idBack: { bucket: 'companies', prefix: 'id-back-' },
+        companyDoc: { bucket: 'companies', prefix: 'doc-' },
+        otherDoc: { bucket: 'companies', prefix: 'other-' },
+      });
+    } catch (err: any) {
+      setIsPending(false);
+      alert(err?.message || 'File upload failed');
+      return;
+    }
+
     const result = await updateCompany(company.id, fd);
     setIsPending(false);
     if (result.success) {

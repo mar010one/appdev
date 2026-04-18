@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { BookOpen, ExternalLink, Plus, Upload, X } from 'lucide-react';
 import ModalPortal from './ModalPortal';
 import { addTutorial } from '@/lib/actions';
+import { uploadFilesInForm } from '@/lib/upload-client';
 
 export default function CreateTutorialModal({ onAdd }: { onAdd?: (t: any) => void }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -22,6 +23,17 @@ export default function CreateTutorialModal({ onAdd }: { onAdd?: (t: any) => voi
     setIsPending(true);
     const fd = new FormData(e.currentTarget);
     fd.set('type', type);
+
+    try {
+      await uploadFilesInForm(fd, {
+        file: { bucket: 'tutorials' },
+      });
+    } catch (err: any) {
+      setIsPending(false);
+      alert(err?.message || 'File upload failed');
+      return;
+    }
+
     const result = await addTutorial(fd);
     setIsPending(false);
     if (result.success) {

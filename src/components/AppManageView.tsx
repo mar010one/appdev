@@ -10,6 +10,7 @@ import {
 import EditAppModal from './EditAppModal';
 import AppStatusMenu from './AppStatusMenu';
 import { addVersion, deleteVersion } from '@/lib/actions';
+import { uploadFilesInForm } from '@/lib/upload-client';
 
 type Screenshot = { id: number; file_path: string };
 type Version = {
@@ -178,6 +179,26 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
     if (iconFile) fd.set('iconSmall', iconFile);
     if (promoFile) fd.set('iconLarge', promoFile);
     shotFiles.forEach((f, i) => fd.append(`screenshot_${i}`, f));
+
+    try {
+      await uploadFilesInForm(fd, {
+        file: { bucket: 'apps' },
+        iconSmall: { bucket: 'icons', prefix: 'v-small-' },
+        iconLarge: { bucket: 'icons', prefix: 'v-large-' },
+        screenshot_0: { bucket: 'screenshots', prefix: 'v-' },
+        screenshot_1: { bucket: 'screenshots', prefix: 'v-' },
+        screenshot_2: { bucket: 'screenshots', prefix: 'v-' },
+        screenshot_3: { bucket: 'screenshots', prefix: 'v-' },
+        screenshot_4: { bucket: 'screenshots', prefix: 'v-' },
+        screenshot_5: { bucket: 'screenshots', prefix: 'v-' },
+        screenshot_6: { bucket: 'screenshots', prefix: 'v-' },
+        screenshot_7: { bucket: 'screenshots', prefix: 'v-' },
+      });
+    } catch (err: any) {
+      setSubmitting(false);
+      alert(err?.message || 'File upload failed');
+      return;
+    }
 
     const res = await addVersion(fd);
     setSubmitting(false);

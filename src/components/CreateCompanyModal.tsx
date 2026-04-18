@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import ModalPortal from './ModalPortal';
 import { addCompany } from '@/lib/actions';
+import { uploadFilesInForm } from '@/lib/upload-client';
 
 export default function CreateCompanyModal({ accounts }: { accounts: any[] }) {
   const router = useRouter();
@@ -34,6 +35,20 @@ export default function CreateCompanyModal({ accounts }: { accounts: any[] }) {
     setIsPending(true);
     const fd = new FormData(e.currentTarget);
     fd.set('hasId', hasId ? '1' : '0');
+
+    try {
+      await uploadFilesInForm(fd, {
+        idFront: { bucket: 'companies', prefix: 'id-front-' },
+        idBack: { bucket: 'companies', prefix: 'id-back-' },
+        companyDoc: { bucket: 'companies', prefix: 'doc-' },
+        otherDoc: { bucket: 'companies', prefix: 'other-' },
+      });
+    } catch (err: any) {
+      setIsPending(false);
+      alert(err?.message || 'File upload failed');
+      return;
+    }
+
     const result = await addCompany(fd);
     setIsPending(false);
     if (result.success) {
