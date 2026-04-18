@@ -8,13 +8,14 @@ import {
   ChevronRight,
   Circle,
   Flag,
+  Pencil,
   Plus,
   Trash2,
   User,
   X,
 } from 'lucide-react';
 import ModalPortal from '@/components/ModalPortal';
-import { addMission, deleteMission, toggleMission, type Mission } from '@/lib/actions';
+import { addMission, deleteMission, toggleMission, updateMission, type Mission } from '@/lib/actions';
 import { getCurrentUser } from '@/lib/auth';
 
 const TEAM_MEMBERS = ['marwan', 'ilyass', 'abdsamad'];
@@ -81,11 +82,17 @@ export default function MissionsView({ initialMissions, today }: Props) {
     });
   }
 
+  function handleUpdate(updated: Mission) {
+    setMissions((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+  }
+
   async function handleAdd(formData: FormData) {
     const res = await addMission(formData);
     if (res.error) return alert(res.error);
-    // Re-fetch by reloading — simpler than tracking ids client-side
-    window.location.reload();
+    if (res.data) {
+      setMissions((prev) => [...prev, res.data!]);
+      setShowAdd(false);
+    }
   }
 
   const hasMissionsForDay = (date: string) => missions.some((m) => m.due_date === date);
@@ -223,6 +230,7 @@ export default function MissionsView({ initialMissions, today }: Props) {
               mission={mission}
               onToggle={handleToggle}
               onDelete={handleDelete}
+              onUpdate={handleUpdate}
             />
           ))}
         </div>
@@ -246,12 +254,15 @@ function MissionCard({
   mission,
   onToggle,
   onDelete,
+  onUpdate,
 }: {
   mission: Mission;
   onToggle: (id: number) => void;
   onDelete: (id: number) => void;
+  onUpdate: (m: Mission) => void;
 }) {
   const done = mission.status === 'done';
+  const [showEdit, setShowEdit] = useState(false);
 
   return (
     <div
@@ -356,27 +367,171 @@ function MissionCard({
         </div>
       </div>
 
-      {/* Delete */}
-      <button
-        onClick={() => {
-          if (confirm('Delete this mission?')) onDelete(mission.id);
-        }}
-        style={{
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          padding: '4px',
-          color: 'var(--muted)',
-          flexShrink: 0,
-          transition: 'color 0.2s',
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
-        onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--muted)')}
-        title="Delete mission"
-      >
-        <Trash2 size={17} />
-      </button>
+      {/* Actions */}
+      <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+        <button
+          onClick={() => setShowEdit(true)}
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '4px',
+            color: 'var(--muted)',
+            transition: 'color 0.2s',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent)')}
+          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--muted)')}
+          title="Edit mission"
+        >
+          <Pencil size={16} />
+        </button>
+        <button
+          onClick={() => {
+            if (confirm('Delete this mission?')) onDelete(mission.id);
+          }}
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '4px',
+            color: 'var(--muted)',
+            transition: 'color 0.2s',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
+          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--muted)')}
+          title="Delete mission"
+        >
+          <Trash2 size={17} />
+        </button>
+      </div>
+
+      {showEdit && (
+        <EditMissionModal
+          mission={mission}
+          onClose={() => setShowEdit(false)}
+          onSave={(updated) => { onUpdate(updated); setShowEdit(false); }}
+        />
+      )}
     </div>
+  );
+}
+
+// ─── EditMissionModal ─────────────────────────────────────────────────────────
+
+function EditMissionModal({
+  mission,
+  onClose,
+  onSave,
+}: {
+  mission: Mission;
+  onClose: () => void;
+  onSave: (m: Mission) => void;
+}) {
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setLoading(true);
+    const fd = new FormData(e.currentTarget);
+    const result = await updateMission(mission.id, fd);
+    setLoading(false);
+    if (result.error) return alert(result.error);
+    onSave({
+      ...mission,
+      title: fd.get('title')?.toString() || mission.title,
+      description: fd.get('description')?.toString() || '',
+      assigned_to: fd.get('assigned_to')?.toString() || '',
+      due_date: fd.get('due_date')?.toString() || mission.due_date,
+      priority: (fd.get('priority')?.toString() || 'normal') as Mission['priority'],
+    });
+  }
+
+  return (
+    <ModalPortal open={true}>
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.7)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '16px',
+        }}
+        onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      >
+        <div
+          className="glass-card"
+          style={{ width: '100%', maxWidth: '480px', borderRadius: '20px', padding: '32px' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 700 }}>Edit Mission</h2>
+            <button
+              onClick={onClose}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: '4px' }}
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--muted)', marginBottom: '6px' }}>
+                Title *
+              </label>
+              <input name="title" required defaultValue={mission.title} placeholder="What needs to be done?" style={{ width: '100%' }} />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--muted)', marginBottom: '6px' }}>
+                Description
+              </label>
+              <textarea name="description" defaultValue={mission.description || ''} placeholder="Optional details…" rows={3} style={{ width: '100%', resize: 'vertical' }} />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--muted)', marginBottom: '6px' }}>
+                  Due Date *
+                </label>
+                <input name="due_date" type="date" required defaultValue={mission.due_date} style={{ width: '100%' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--muted)', marginBottom: '6px' }}>
+                  Priority
+                </label>
+                <select name="priority" defaultValue={mission.priority} style={{ width: '100%' }}>
+                  <option value="high">High</option>
+                  <option value="normal">Normal</option>
+                  <option value="low">Low</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--muted)', marginBottom: '6px' }}>
+                Assign To
+              </label>
+              <select name="assigned_to" defaultValue={mission.assigned_to || ''} style={{ width: '100%' }}>
+                <option value="">— Unassigned —</option>
+                {TEAM_MEMBERS.map((m) => (
+                  <option key={m} value={m}>{m.charAt(0).toUpperCase() + m.slice(1)}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '8px' }}>
+              <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+              <button type="submit" className="btn btn-primary" disabled={loading}>
+                {loading ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </ModalPortal>
   );
 }
 

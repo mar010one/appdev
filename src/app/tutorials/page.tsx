@@ -1,6 +1,5 @@
 import { getTutorials } from '@/lib/actions';
 import TutorialsView from '@/components/TutorialsView';
-import CreateTutorialModal from '@/components/CreateTutorialModal';
 
 export default async function TutorialsPage() {
   let tutorials: any[] = [];
@@ -27,7 +26,6 @@ export default async function TutorialsPage() {
             Shared guides and resources — upload files or link to external content.
           </p>
         </div>
-        <CreateTutorialModal />
       </header>
 
       <TutorialsView initialTutorials={tutorials} />

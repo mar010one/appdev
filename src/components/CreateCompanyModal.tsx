@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Building2,
   CheckCircle2,
-  ChevronLeft,
   FileText,
   Hash,
   IdCard,
@@ -17,14 +17,11 @@ import ModalPortal from './ModalPortal';
 import { addCompany } from '@/lib/actions';
 
 export default function CreateCompanyModal({ accounts }: { accounts: any[] }) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [hasId, setHasId] = useState(false);
   const [fileCounts, setFileCounts] = useState({ idFront: 0, idBack: 0, companyDoc: 0, otherDoc: 0 });
-
-  function handleFileChange(field: keyof typeof fileCounts, count: number) {
-    setFileCounts((prev) => ({ ...prev, [field]: count }));
-  }
 
   function handleOpen() {
     setIsOpen(true);
@@ -41,6 +38,7 @@ export default function CreateCompanyModal({ accounts }: { accounts: any[] }) {
     setIsPending(false);
     if (result.success) {
       setIsOpen(false);
+      router.refresh();
     } else {
       alert(result.error || 'Something went wrong');
     }
@@ -54,172 +52,151 @@ export default function CreateCompanyModal({ accounts }: { accounts: any[] }) {
       </button>
 
       <ModalPortal open={isOpen}>
-        <div className="modal-overlay fullscreen" onClick={() => setIsOpen(false)}>
-          <div className="modal-content fullscreen-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={() => setIsOpen(false)}>
+          <div className="modal-content co-modal" onClick={(e) => e.stopPropagation()}>
 
             {/* Header */}
-            <div className="modal-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                <div className="app-icon-preview" style={{ background: 'var(--accent-glow)' }}>
-                  <Building2 size={24} color="var(--accent)" />
+            <div className="co-modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '11px' }}>
+                <div style={{
+                  width: '34px', height: '34px', borderRadius: '9px',
+                  background: 'var(--accent-glow)', border: '1px solid rgba(234,179,8,0.2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}>
+                  <Building2 size={17} color="var(--accent)" />
                 </div>
                 <div>
-                  <h2>Register Company</h2>
-                  <p className="text-muted">Add company info, upload documents, and link to a Google Play account.</p>
+                  <h3 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0 }}>Register Company</h3>
+                  <p style={{ fontSize: '0.73rem', color: 'var(--muted)', margin: 0 }}>
+                    Add info, upload documents, and link to Google Play.
+                  </p>
                 </div>
               </div>
-              <button className="modal-close" onClick={() => setIsOpen(false)}>
-                <X size={24} />
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                style={{
+                  width: '28px', height: '28px', borderRadius: '7px',
+                  background: 'var(--glass)', border: '1px solid var(--card-border)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', color: 'var(--muted)',
+                }}
+              >
+                <X size={15} />
               </button>
             </div>
 
-            <form id="create-company-form" onSubmit={handleSubmit} className="modal-body max-w-screen">
-              <div className="form-split-view">
+            <form id="create-company-form" onSubmit={handleSubmit}>
+              <div className="co-modal-body">
 
-                {/* ── Left column: Company info ── */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                  <div className="section-title">
-                    <Building2 size={20} color="var(--accent)" />
-                    <h4>Company Info</h4>
-                  </div>
+                {/* ── Left: Company Info ── */}
+                <div className="co-section">
+                  <p className="co-section-label">
+                    <Building2 size={12} /> Company Info
+                  </p>
 
-                  <div className="input-field">
-                    <label>Company Name <span style={{ color: '#ef4444' }}>*</span></label>
-                    <div className="input-with-icon-large">
-                      <Building2 size={20} />
-                      <input type="text" name="name" placeholder="e.g., Nexus Digital SARL" required />
+                  <CoField label="Company Name *">
+                    <div className="co-input-row">
+                      <Building2 size={14} color="var(--muted)" />
+                      <input type="text" name="name" placeholder="e.g., Nexus Digital SARL" required className="co-input" />
                     </div>
+                  </CoField>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <CoField label="ICE">
+                      <div className="co-input-row">
+                        <Hash size={13} color="var(--muted)" />
+                        <input type="text" name="ice" placeholder="000 000 000" className="co-input" />
+                      </div>
+                    </CoField>
+                    <CoField label="DUNS">
+                      <div className="co-input-row">
+                        <Hash size={13} color="var(--muted)" />
+                        <input type="text" name="duns" placeholder="12-345-6789" className="co-input" />
+                      </div>
+                    </CoField>
                   </div>
 
-                  <div className="input-field">
-                    <label>
-                      ICE
-                      <span style={{ color: 'var(--muted)', fontWeight: 400, marginLeft: '6px', fontSize: '0.8rem' }}>
-                        Identifiant Commun de l'Entreprise
-                      </span>
-                    </label>
-                    <div className="input-with-icon-large">
-                      <Hash size={20} />
-                      <input type="text" name="ice" placeholder="000 000 000 000 000" />
+                  <CoField label="DED License Number">
+                    <div className="co-input-row">
+                      <Hash size={13} color="var(--muted)" />
+                      <input type="text" name="ded" placeholder="DED-XXXXX" className="co-input" />
                     </div>
-                  </div>
+                  </CoField>
 
-                  <div className="input-field">
-                    <label>DUNS Number</label>
-                    <div className="input-with-icon-large">
-                      <Hash size={20} />
-                      <input type="text" name="duns" placeholder="12-345-6789" />
-                    </div>
-                  </div>
-
-                  <div className="input-field">
-                    <label>DED License Number</label>
-                    <div className="input-with-icon-large">
-                      <Hash size={20} />
-                      <input type="text" name="ded" placeholder="DED-XXXXX" />
-                    </div>
-                  </div>
-
-                  {/* Has ID toggle */}
-                  <div className="input-field">
-                    <label>Physical ID collected?</label>
+                  <CoField label="Physical ID Collected?">
                     <button
                       type="button"
                       onClick={() => setHasId((v) => !v)}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        padding: '10px 20px',
-                        borderRadius: '14px',
-                        border: `1px solid ${hasId ? 'rgba(34,197,94,0.4)' : 'var(--card-border)'}`,
-                        background: hasId ? 'rgba(34,197,94,0.1)' : 'var(--glass)',
-                        color: hasId ? '#22c55e' : 'var(--muted)',
-                        fontWeight: 700,
-                        fontSize: '0.9rem',
-                        cursor: 'pointer',
-                        width: 'fit-content',
-                        fontFamily: 'inherit',
-                      }}
+                      className={`co-toggle${hasId ? ' co-yes' : ''}`}
                     >
-                      <CheckCircle2 size={18} />
+                      <CheckCircle2 size={14} />
                       {hasId ? 'Yes — ID collected' : 'No — not yet collected'}
                     </button>
-                  </div>
+                  </CoField>
 
-                  {/* Notes */}
-                  <div className="input-field">
-                    <label>Notes <span style={{ color: 'var(--muted)', fontWeight: 400, fontSize: '0.8rem' }}>(optional)</span></label>
+                  <CoField label="Notes (optional)">
                     <textarea
                       name="notes"
                       placeholder="Any additional notes…"
                       rows={3}
-                      className="glass-input"
-                      style={{ resize: 'vertical', paddingTop: '12px' }}
+                      className="co-textarea"
                     />
-                  </div>
+                  </CoField>
 
-                  {/* Linked account */}
-                  <div className="input-field">
-                    <label>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                        <Link2 size={15} color="var(--accent)" />
-                        Link to Google Play Account
-                        <span style={{ color: 'var(--muted)', fontWeight: 400, fontSize: '0.8rem' }}>(optional)</span>
-                      </span>
-                    </label>
-                    <select name="linkedAccountId" className="glass-select">
+                  <CoField label={
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <Link2 size={11} color="var(--accent)" /> Link to Google Play Account
+                    </span>
+                  }>
+                    <select name="linkedAccountId" className="co-select">
                       <option value="">— Not linked yet —</option>
                       {accounts.map((acc) => (
                         <option key={acc.id} value={acc.id}>
-                          {acc.developer_name || acc.email}
-                          {acc.developer_id ? ` (#${acc.developer_id})` : ''}
+                          {acc.developer_name || acc.email}{acc.developer_id ? ` (#${acc.developer_id})` : ''}
                         </option>
                       ))}
                     </select>
-                  </div>
+                  </CoField>
                 </div>
 
-                {/* ── Right column: Documents ── */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                  <div className="section-title">
-                    <FileText size={20} color="var(--accent)" />
-                    <h4>Upload Documents</h4>
-                  </div>
-
-                  <p className="text-muted" style={{ fontSize: '0.82rem', marginTop: '-12px' }}>
-                    Each category supports multiple files. You can add more documents later via Edit.
+                {/* ── Right: Documents ── */}
+                <div className="co-section">
+                  <p className="co-section-label">
+                    <FileText size={12} /> Documents
+                  </p>
+                  <p style={{ fontSize: '0.71rem', color: 'var(--muted)', marginTop: '-6px', marginBottom: '2px' }}>
+                    Each category supports multiple files. Add more later via Edit.
                   </p>
 
-                  <MultiUploadField
+                  <CoUpload
                     name="idFront"
                     label="ID Card — Front"
-                    icon={<IdCard size={22} color="var(--accent)" />}
+                    icon={<IdCard size={13} color="var(--accent)" />}
                     count={fileCounts.idFront}
-                    onChange={(n) => handleFileChange('idFront', n)}
+                    onChange={(n) => setFileCounts((p) => ({ ...p, idFront: n }))}
                   />
-                  <MultiUploadField
+                  <CoUpload
                     name="idBack"
                     label="ID Card — Back"
-                    icon={<IdCard size={22} color="var(--accent)" />}
+                    icon={<IdCard size={13} color="var(--accent)" />}
                     count={fileCounts.idBack}
-                    onChange={(n) => handleFileChange('idBack', n)}
+                    onChange={(n) => setFileCounts((p) => ({ ...p, idBack: n }))}
                   />
-                  <MultiUploadField
+                  <CoUpload
                     name="companyDoc"
                     label="Company Documents"
-                    hint="Registration, patent, license, etc."
-                    icon={<FileText size={22} color="var(--accent)" />}
+                    hint="Registration, patent, license…"
+                    icon={<FileText size={13} color="var(--accent)" />}
                     count={fileCounts.companyDoc}
-                    onChange={(n) => handleFileChange('companyDoc', n)}
+                    onChange={(n) => setFileCounts((p) => ({ ...p, companyDoc: n }))}
                   />
-                  <MultiUploadField
+                  <CoUpload
                     name="otherDoc"
                     label="Other Documents"
-                    hint="Any additional supporting files"
-                    icon={<Upload size={22} color="var(--muted)" />}
+                    icon={<Upload size={13} color="var(--muted)" />}
                     count={fileCounts.otherDoc}
-                    onChange={(n) => handleFileChange('otherDoc', n)}
+                    onChange={(n) => setFileCounts((p) => ({ ...p, otherDoc: n }))}
                     muted
                   />
                 </div>
@@ -227,17 +204,23 @@ export default function CreateCompanyModal({ accounts }: { accounts: any[] }) {
             </form>
 
             {/* Footer */}
-            <div className="modal-footer sticky-footer">
-              <button type="button" className="btn btn-secondary" onClick={() => setIsOpen(false)}>
-                <ChevronLeft size={18} /> Cancel
+            <div className="co-modal-footer">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ padding: '8px 18px', fontSize: '0.84rem', borderRadius: '9px' }}
+                onClick={() => setIsOpen(false)}
+              >
+                Cancel
               </button>
               <button
                 type="submit"
                 form="create-company-form"
                 className="btn btn-accent btn-glow"
+                style={{ padding: '8px 18px', fontSize: '0.84rem', borderRadius: '9px' }}
                 disabled={isPending}
               >
-                <Building2 size={18} style={{ marginRight: '8px' }} />
+                <Building2 size={14} />
                 {isPending ? 'Saving…' : 'Save Company'}
               </button>
             </div>
@@ -248,7 +231,18 @@ export default function CreateCompanyModal({ accounts }: { accounts: any[] }) {
   );
 }
 
-function MultiUploadField({
+/* ── Shared sub-components ── */
+
+function CoField({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="co-field">
+      <label className="co-label">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function CoUpload({
   name,
   label,
   hint,
@@ -266,36 +260,25 @@ function MultiUploadField({
   muted?: boolean;
 }) {
   return (
-    <div className="input-field">
-      <label>{label}</label>
+    <div className="co-field">
+      <label className="co-label" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        {icon} {label}
+      </label>
       {hint && (
-        <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginBottom: '8px', marginTop: '-4px' }}>{hint}</p>
+        <p style={{ fontSize: '0.68rem', color: 'var(--muted)', margin: '0 0 2px' }}>{hint}</p>
       )}
-      <label
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '8px',
-          padding: '16px',
-          borderRadius: '12px',
-          border: `1.5px dashed ${count > 0 ? 'rgba(34,197,94,0.4)' : muted ? 'rgba(255,255,255,0.1)' : 'rgba(234,179,8,0.3)'}`,
-          background: count > 0 ? 'rgba(34,197,94,0.06)' : 'var(--glass)',
-          cursor: 'pointer',
-          transition: 'border-color 0.2s, background 0.2s',
-        }}
-      >
-        {icon}
-        {count > 0 ? (
-          <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#22c55e' }}>
-            {count} file{count !== 1 ? 's' : ''} selected
-          </span>
-        ) : (
-          <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
-            Click to select (multiple allowed)
-          </span>
-        )}
+      <label className={`co-upload-area${count > 0 ? ' co-selected' : muted ? ' co-muted' : ''}`}>
+        <Upload size={13} color={count > 0 ? '#22c55e' : 'var(--muted)'} style={{ flexShrink: 0 }} />
+        <span style={{
+          fontSize: '0.78rem',
+          color: count > 0 ? '#22c55e' : 'var(--muted)',
+          fontWeight: count > 0 ? 700 : 400,
+          flex: 1,
+        }}>
+          {count > 0
+            ? `${count} file${count !== 1 ? 's' : ''} selected`
+            : 'Click to select (multiple allowed)'}
+        </span>
         <input
           type="file"
           name={name}

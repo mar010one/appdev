@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   Mail, Globe, Search, ShieldCheck, ShieldAlert,
@@ -15,6 +15,7 @@ type StatusFilter = 'all' | 'active' | 'closed';
 
 export default function AccountList({ initialAccounts }: { initialAccounts: any[] }) {
   const [accounts, setAccounts] = useState<any[]>(initialAccounts);
+  useEffect(() => { setAccounts(initialAccounts); }, [initialAccounts]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [updatingId, setUpdatingId] = useState<number | null>(null);

@@ -26,6 +26,8 @@ function YtIcon({ size = 20 }: { size?: number }) {
 }
 import ModalPortal from '@/components/ModalPortal';
 import { deleteTutorial } from '@/lib/actions';
+import CreateTutorialModal from '@/components/CreateTutorialModal';
+import EditTutorialModal from '@/components/EditTutorialModal';
 
 type Tutorial = {
   id: number;
@@ -276,6 +278,14 @@ function CardThumbnail({ tutorial }: { tutorial: Tutorial }) {
 
 export default function TutorialsView({ initialTutorials }: { initialTutorials: Tutorial[] }) {
   const [tutorials, setTutorials] = useState<Tutorial[]>(initialTutorials);
+
+  function handleAdd(t: Tutorial) {
+    setTutorials((prev) => [t, ...prev]);
+  }
+
+  function handleUpdate(t: Tutorial) {
+    setTutorials((prev) => prev.map((x) => (x.id === t.id ? t : x)));
+  }
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'link' | 'upload'>('all');
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -311,6 +321,7 @@ export default function TutorialsView({ initialTutorials }: { initialTutorials: 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
         {/* Controls */}
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <CreateTutorialModal onAdd={handleAdd} />
           <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
             <Search
               size={16}
@@ -521,6 +532,7 @@ export default function TutorialsView({ initialTutorials }: { initialTutorials: 
                     </a>
                   ) : null}
 
+                  <EditTutorialModal tutorial={t} onUpdate={handleUpdate} />
                   <button
                     className="btn btn-secondary"
                     style={{ padding: '8px 12px', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }}

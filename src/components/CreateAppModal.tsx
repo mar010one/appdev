@@ -52,6 +52,7 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
   const [aiPrompt, setAiPrompt] = useState('');
   const [shortKwCount, setShortKwCount] = useState(2);
   const [longKwCount, setLongKwCount] = useState(6);
+  const [kwRepeatCount, setKwRepeatCount] = useState(3);
   const [keywordInput, setKeywordInput] = useState('');
   const [keywords, setKeywords] = useState<string[]>([]);
   const [usedKeywords, setUsedKeywords] = useState<string[]>([]);
@@ -79,8 +80,14 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
   const [screenshotPreviews, setScreenshotPreviews] = useState<string[]>([]);
   const [screenshotFiles, setScreenshotFiles] = useState<File[]>([]);
   const [aabFile, setAabFile] = useState<File | null>(null);
+  const [aabExternalLink, setAabExternalLink] = useState('');
+  const [aabInputMode, setAabInputMode] = useState<'file' | 'link'>('file');
   const [iconError, setIconError] = useState<string | null>(null);
   const [promoError, setPromoError] = useState<string | null>(null);
+  const [aabError, setAabError] = useState<string | null>(null);
+
+  // Must match STORAGE_MAX_BYTES in actions.ts
+  const MAX_FILE_MB = 100;
 
   const selectedAccount = useMemo(
     () => accounts.find(a => String(a.id) === String(selectedAccountId)),
@@ -106,6 +113,7 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
     const result = await generateAppDescriptions(aiPrompt, {
       keywordCount: Math.max(shortKwCount, longKwCount),
       keywords,
+      kwRepeatCount,
     });
     setIsGenerating(false);
 
@@ -141,6 +149,16 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
     setKeywords(prev => prev.filter(k => k !== kw));
   };
 
+  const countWords = (text: string) =>
+    text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
+
+  const countKeywordInDesc = (kw: string): number => {
+    if (!kw) return 0;
+    const combined = (shortDesc + ' ' + longDesc).toLowerCase();
+    const escaped = kw.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return (combined.match(new RegExp(escaped, 'g')) || []).length;
+  };
+
   async function handleFieldAi(target: 'short' | 'long', mode: 'generate' | 'refine') {
     const concept = aiPrompt.trim() || appName.trim();
     if (!concept) {
@@ -158,6 +176,7 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
     const result = await generateDescriptionField(target, concept, {
       keywordCount: target === 'short' ? shortKwCount : longKwCount,
       keywords,
+      kwRepeatCount,
       current: mode === 'refine' ? current : undefined,
       appName,
       mode,
@@ -195,7 +214,8 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
 
     if (iconFile) formData.set('iconSmall', iconFile);
     if (promoFile) formData.set('iconLarge', promoFile);
-    if (aabFile) formData.set('aabFile', aabFile);
+    if (aabInputMode === 'file' && aabFile) formData.set('aabFile', aabFile);
+    if (aabInputMode === 'link' && aabExternalLink.trim()) formData.set('aabExternalLink', aabExternalLink.trim());
 
     // Append screenshots
     screenshotFiles.forEach((file, index) => {
@@ -221,6 +241,7 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
     setAiPrompt('');
     setShortKwCount(2);
     setLongKwCount(6);
+    setKwRepeatCount(3);
     setKeywordInput('');
     setKeywords([]);
     setUsedKeywords([]);
@@ -241,8 +262,11 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
     setScreenshotPreviews([]);
     setScreenshotFiles([]);
     setAabFile(null);
+    setAabExternalLink('');
+    setAabInputMode('file');
     setIconError(null);
     setPromoError(null);
+    setAabError(null);
   };
 
   function checkImageDimensions(file: File, w: number, h: number): Promise<string | null> {
@@ -308,6 +332,12 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
     2: 'Content Studio',
     3: 'Visual Assets',
     4: 'Contact & Compliance',
+  };
+
+  const nextStepLabels: Record<number, string> = {
+    1: 'Content Studio',
+    2: 'Visual Assets',
+    3: 'Contact & Compliance',
   };
 
   const stepIcons = [
@@ -510,16 +540,54 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
 
                         {keywords.length > 0 && (
                           <div className="kw-chip-row">
-                            {keywords.map((kw) => (
-                              <span key={kw} className="kw-chip">
-                                {kw}
-                                <button type="button" onClick={() => removeKeyword(kw)} aria-label={`Remove ${kw}`}>
-                                  <X size={12} />
-                                </button>
-                              </span>
-                            ))}
+                            {keywords.map((kw) => {
+                              const count = countKeywordInDesc(kw);
+                              return (
+                                <span key={kw} className="kw-chip">
+                                  {kw}
+                                  {count > 0 && (
+                                    <span className={`kw-freq-badge ${count >= kwRepeatCount ? 'freq-high' : count >= Math.ceil(kwRepeatCount / 2) ? 'freq-mid' : 'freq-low'}`}>
+                                      ×{count}
+                                    </span>
+                                  )}
+                                  <button type="button" onClick={() => removeKeyword(kw)} aria-label={`Remove ${kw}`}>
+                                    <X size={12} />
+                                  </button>
+                                </span>
+                              );
+                            })}
                           </div>
                         )}
+
+                        {/* Keyword repeat target */}
+                        <div className="kw-repeat-row">
+                          <div className="kw-repeat-label">
+                            <Tag size={13} />
+                            <span>Repeat each keyword</span>
+                          </div>
+                          <div className="kw-repeat-stepper">
+                            <button
+                              type="button"
+                              className="kw-mini-btn"
+                              onClick={() => setKwRepeatCount(c => Math.max(1, c - 1))}
+                              disabled={kwRepeatCount <= 1}
+                              aria-label="Decrease repeat count"
+                            >
+                              <Minus size={12} />
+                            </button>
+                            <span className="kw-mini-value">{kwRepeatCount}×</span>
+                            <button
+                              type="button"
+                              className="kw-mini-btn"
+                              onClick={() => setKwRepeatCount(c => Math.min(10, c + 1))}
+                              disabled={kwRepeatCount >= 10}
+                              aria-label="Increase repeat count"
+                            >
+                              <Plus size={12} />
+                            </button>
+                          </div>
+                          <span className="kw-repeat-hint">in long description</span>
+                        </div>
                       </div>
 
                       <button
@@ -636,17 +704,16 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
                           <div className="field-card-title">
                             <span className="field-card-dot" />
                             <label>Full Description</label>
-                            <span className="field-card-sub">Long · max 4,000 chars</span>
+                            <span className="field-card-sub">Long · max 900 words</span>
                           </div>
-                          <span className={`char-count-pill ${longDesc.length > 4000 ? 'error' : longDesc.length > 3500 ? 'warning' : ''}`}>
-                            {longDesc.length.toLocaleString()} / 4,000
+                          <span className={`char-count-pill ${countWords(longDesc) > 900 ? 'error' : countWords(longDesc) > 800 ? 'warning' : ''}`}>
+                            {countWords(longDesc).toLocaleString()} / 900 words
                           </span>
                         </div>
 
                         <textarea
                           className="field-textarea premium-scroll"
                           placeholder="Detailed features, benefits, and call to action — or click AI Generate below"
-                          maxLength={4000}
                           value={longDesc}
                           onChange={(e) => setLongDesc(e.target.value)}
                         />
@@ -849,50 +916,149 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
                       <span>Optional · .aab file for Google Play</span>
                     </div>
 
-                    {aabFile ? (
-                      <div className="aab-upload-card has-file">
-                        <div className="aab-icon-box">
-                          <Package size={26} />
+                    {/* Mode toggle */}
+                    <div className="aab-mode-toggle">
+                      <button
+                        type="button"
+                        className={`aab-mode-btn ${aabInputMode === 'file' ? 'active' : ''}`}
+                        onClick={() => { setAabInputMode('file'); setAabExternalLink(''); }}
+                      >
+                        <Upload size={13} /> Upload file
+                      </button>
+                      <button
+                        type="button"
+                        className={`aab-mode-btn ${aabInputMode === 'link' ? 'active' : ''}`}
+                        onClick={() => { setAabInputMode('link'); setAabFile(null); setAabError(null); }}
+                      >
+                        <LinkIcon size={13} /> Paste link
+                      </button>
+                    </div>
+
+                    {aabInputMode === 'file' ? (
+                      aabFile ? (
+                        <div className={`aab-upload-card has-file ${aabError ? 'has-error' : ''}`}>
+                          <div className="aab-icon-box">
+                            <Package size={26} />
+                          </div>
+                          <div className="aab-upload-info">
+                            <div className="aab-upload-title">Bundle ready</div>
+                            <div className="aab-file-name">{aabFile.name}</div>
+                            <div className="aab-upload-sub">{(aabFile.size / 1024 / 1024).toFixed(1)} MB</div>
+                          </div>
+                          {!aabError && <span className="aab-status-badge"><Check size={12} /> Attached</span>}
+                          <label className="aab-change-btn" style={{ cursor: 'pointer' }}>
+                            <Upload size={13} /> Change
+                            <input
+                              type="file"
+                              accept=".aab"
+                              className="hidden-input"
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (!f) return;
+                                if (f.size > MAX_FILE_MB * 1024 * 1024) {
+                                  setAabError(`File is ${(f.size / 1024 / 1024).toFixed(1)} MB — exceeds the ${MAX_FILE_MB} MB limit.`);
+                                  setAabFile(f);
+                                } else {
+                                  setAabError(null);
+                                  setAabFile(f);
+                                }
+                              }}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            className="aab-remove-btn"
+                            onClick={() => { setAabFile(null); setAabError(null); }}
+                            title="Remove file"
+                          >
+                            <X size={13} /> Remove
+                          </button>
                         </div>
-                        <div className="aab-upload-info">
-                          <div className="aab-upload-title">Bundle ready</div>
-                          <div className="aab-file-name">{aabFile.name}</div>
-                          <div className="aab-upload-sub">{(aabFile.size / 1024 / 1024).toFixed(1)} MB</div>
-                        </div>
-                        <span className="aab-status-badge"><Check size={12} /> Attached</span>
-                        <label className="aab-change-btn" style={{ cursor: 'pointer' }}>
-                          <Upload size={13} /> Change
+                      ) : (
+                        <label className="aab-upload-card" style={{ cursor: 'pointer' }}>
+                          <div className="aab-icon-box">
+                            <Package size={26} />
+                          </div>
+                          <div className="aab-upload-info">
+                            <div className="aab-upload-title">Upload App Bundle (AAB)</div>
+                            <div className="aab-upload-sub">Drag & drop or click to select · .aab · max {MAX_FILE_MB} MB</div>
+                          </div>
+                          <Upload size={20} color="var(--muted)" />
                           <input
                             type="file"
                             accept=".aab"
                             className="hidden-input"
                             onChange={(e) => {
                               const f = e.target.files?.[0];
-                              if (f) setAabFile(f);
+                              if (!f) return;
+                              if (f.size > MAX_FILE_MB * 1024 * 1024) {
+                                setAabError(`File is ${(f.size / 1024 / 1024).toFixed(1)} MB — exceeds the ${MAX_FILE_MB} MB limit.`);
+                                setAabFile(f);
+                              } else {
+                                setAabError(null);
+                                setAabFile(f);
+                              }
                             }}
                           />
                         </label>
-                      </div>
+                      )
                     ) : (
-                      <label className="aab-upload-card" style={{ cursor: 'pointer' }}>
-                        <div className="aab-icon-box">
-                          <Package size={26} />
+                      <div className="aab-link-section">
+                        <div className="aab-link-hint">
+                          File too large for Supabase (50 MB limit)? Upload it to SendSpace or MediaFire, then paste the download link here.
                         </div>
-                        <div className="aab-upload-info">
-                          <div className="aab-upload-title">Upload App Bundle (AAB)</div>
-                          <div className="aab-upload-sub">Drag & drop or click to select · .aab</div>
+                        <div className="aab-link-row">
+                          <div className="aab-link-input-wrap">
+                            <LinkIcon size={15} className="aab-link-icon" />
+                            <input
+                              type="url"
+                              className="aab-link-input"
+                              placeholder="https://www.sendspace.com/file/… or MediaFire link"
+                              value={aabExternalLink}
+                              onChange={(e) => setAabExternalLink(e.target.value)}
+                            />
+                            {aabExternalLink && (
+                              <button
+                                type="button"
+                                className="aab-link-clear"
+                                onClick={() => setAabExternalLink('')}
+                                title="Clear link"
+                              >
+                                <X size={13} />
+                              </button>
+                            )}
+                          </div>
+                          <a
+                            href="https://www.sendspace.com"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="aab-host-btn sendspace"
+                            title="Upload to SendSpace"
+                          >
+                            <Upload size={13} /> SendSpace
+                          </a>
+                          <a
+                            href="https://www.mediafire.com/upload/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="aab-host-btn mediafire"
+                            title="Upload to MediaFire"
+                          >
+                            <Upload size={13} /> MediaFire
+                          </a>
                         </div>
-                        <Upload size={20} color="var(--muted)" />
-                        <input
-                          type="file"
-                          accept=".aab"
-                          className="hidden-input"
-                          onChange={(e) => {
-                            const f = e.target.files?.[0];
-                            if (f) setAabFile(f);
-                          }}
-                        />
-                      </label>
+                        {aabExternalLink && (
+                          <div className="aab-link-preview">
+                            <Check size={12} color="#22c55e" /> Link saved
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {aabError && (
+                      <div className="asset-error-msg" style={{ marginTop: 8 }}>
+                        <AlertCircle size={14} />
+                        <span>{aabError} Raise the limit: Supabase dashboard → Storage → Buckets → uploads → Edit.</span>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -1005,17 +1171,30 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
                 {step === 1 ? 'Cancel' : <><ChevronLeft size={18} /> Back</>}
               </button>
 
+              <div className="step-dots">
+                {[1, 2, 3, 4].map(s => (
+                  <span
+                    key={s}
+                    className={`step-dot ${s < step ? 'done' : s === step ? 'current' : ''}`}
+                  />
+                ))}
+              </div>
+
               <div style={{ display: 'flex', gap: '15px' }}>
                 {step < TOTAL_STEPS ? (
-                  <button type="button" className="btn btn-primary" onClick={nextStep} style={{ width: '140px' }}>
-                    Next <ChevronRight size={18} />
+                  <button type="button" className="btn-next-v2" onClick={nextStep}>
+                    <span className="btn-next-v2-text">
+                      <span className="btn-next-v2-sublabel">Next up</span>
+                      <span className="btn-next-v2-label">{nextStepLabels[step]}</span>
+                    </span>
+                    <span className="btn-next-v2-icon"><ChevronRight size={18} /></span>
                   </button>
                 ) : (
                   <button
                     type="button"
                     className="btn btn-accent btn-glow"
                     onClick={handleFinalSubmit}
-                    disabled={isPending || shortDesc.length > 80 || longDesc.length > 4000}
+                    disabled={isPending || shortDesc.length > 80 || countWords(longDesc) > 900 || !!aabError}
                   >
                     {isPending ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
                     {isPending ? 'Deploying...' : 'Save & Generate Info Page'}

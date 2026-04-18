@@ -68,18 +68,10 @@ function CopyableField({ label, value, multiline, icon, href }: CopyableProps) {
 
   async function copyNow() {
     if (!value) return;
-    try {
-      await navigator.clipboard.writeText(value);
+    const ok = await copyText(value);
+    if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
-    } catch {
-      // graceful fallback
-      const ta = document.createElement('textarea');
-      ta.value = value;
-      document.body.appendChild(ta);
-      ta.select();
-      try { document.execCommand('copy'); setCopied(true); setTimeout(() => setCopied(false), 1600); } catch {}
-      document.body.removeChild(ta);
     }
   }
 
@@ -120,6 +112,45 @@ function fileNameFromPath(p?: string) {
   return parts[parts.length - 1] || 'image';
 }
 
+async function copyText(text: string): Promise<boolean> {
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {}
+  }
+  // Fallback for HTTP or denied permissions
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch {}
+  document.body.removeChild(ta);
+  return ok;
+}
+
+async function downloadFile(url: string, filename: string) {
+  try {
+    const res = await fetch(url, { mode: 'cors' });
+    if (!res.ok) throw new Error('fetch failed');
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+  } catch {
+    // CORS fallback: open in new tab so user can save manually
+    window.open(url, '_blank', 'noopener');
+  }
+}
+
 function ImageAsset({ label, src, hint }: { label: string; src?: string | null; hint?: string }) {
   if (!src) {
     return (
@@ -143,9 +174,9 @@ function ImageAsset({ label, src, hint }: { label: string; src?: string | null; 
         <strong>{label}</strong>
         {hint && <span>{hint}</span>}
         <div className="image-asset-actions">
-          <a href={src} download={fileNameFromPath(src)} className="info-mini-btn">
+          <button onClick={() => downloadFile(src, fileNameFromPath(src))} className="info-mini-btn">
             <Download size={14} /> <span>Download</span>
-          </a>
+          </button>
           <a href={src} target="_blank" rel="noreferrer" className="info-mini-btn">
             <ExternalLink size={14} /> <span>Open</span>
           </a>
@@ -251,11 +282,11 @@ export default function AppInfoView({
   const bundleText = lines.join('\n');
 
   async function copyAll() {
-    try {
-      await navigator.clipboard.writeText(bundleText);
+    const ok = await copyText(bundleText);
+    if (ok) {
       setBundleCopied(true);
       setTimeout(() => setBundleCopied(false), 1800);
-    } catch {}
+    }
   }
 
   const screenshots = app.screenshots || [];
@@ -533,9 +564,9 @@ export default function AppInfoView({
                 <div key={shot.id} className="screenshot-info-card">
                   <img src={shot.file_path} alt={`Screenshot ${i + 1}`} />
                   <div className="screenshot-info-actions">
-                    <a href={shot.file_path} download={fileNameFromPath(shot.file_path)} className="info-mini-btn">
+                    <button onClick={() => downloadFile(shot.file_path, fileNameFromPath(shot.file_path))} className="info-mini-btn">
                       <Download size={14} />
-                    </a>
+                    </button>
                     <a href={shot.file_path} target="_blank" rel="noreferrer" className="info-mini-btn">
                       <ExternalLink size={14} />
                     </a>

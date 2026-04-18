@@ -3,6 +3,7 @@
 import { Smartphone, ExternalLink, ChevronRight, Hash, Trash2, Share2, Check, History } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import EditAppModal from "./EditAppModal";
 import AppStatusMenu from "./AppStatusMenu";
 import { deleteApp } from "@/lib/actions";
@@ -16,12 +17,14 @@ export default function AppList({
   hideDeveloperColumn?: boolean;
   emptyMessage?: string;
 }) {
+  const router = useRouter();
   const [copiedId, setCopiedId] = useState<number | null>(null);
 
   async function handleDelete(id: number, name: string) {
     if (confirm(`Are you sure you want to delete ${name}? This will remove all version history.`)) {
       const result = await deleteApp(id);
       if (result.error) alert(result.error);
+      else router.refresh();
     }
   }
 

@@ -13,16 +13,16 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (getCurrentUser()) {
-      router.replace('/');
-    }
+    getCurrentUser().then((u) => {
+      if (u) router.replace('/');
+    });
   }, [router]);
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
-    const user = login(email, password);
+    const user = await login(email, password);
     if (!user) {
       setError('Invalid email or password.');
       setSubmitting(false);

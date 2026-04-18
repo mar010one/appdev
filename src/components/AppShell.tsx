@@ -1,6 +1,6 @@
 'use client';
 
-import { BookOpen, Building2, ClipboardList, LayoutDashboard, LogOut, Settings, Smartphone, Users, Wallet } from 'lucide-react';
+import { BookOpen, Building2, ClipboardList, Globe, Hash, LayoutDashboard, LogOut, Settings, Smartphone, Users, Wallet } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { ReactNode, useEffect, useState } from 'react';
@@ -20,17 +20,18 @@ export default function AppShell({ children }: { children: ReactNode }) {
       setChecked(true);
       return;
     }
-    const current = getCurrentUser();
-    if (!current) {
-      router.replace('/login');
-      return;
-    }
-    if (!canAccess(current, pathname)) {
-      router.replace('/');
-      return;
-    }
-    setUser(current);
-    setChecked(true);
+    getCurrentUser().then((current) => {
+      if (!current) {
+        router.replace('/login');
+        return;
+      }
+      if (!canAccess(current, pathname)) {
+        router.replace('/');
+        return;
+      }
+      setUser(current);
+      setChecked(true);
+    });
   }, [pathname, isPublic, isLogin, router]);
 
   if (isPublic) {
@@ -49,8 +50,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
     return <div className="auth-loading">Loading…</div>;
   }
 
-  function handleLogout() {
-    logout();
+  async function handleLogout() {
+    await logout();
     router.replace('/login');
   }
 
@@ -93,6 +94,16 @@ export default function AppShell({ children }: { children: ReactNode }) {
             <BookOpen size={20} />
             <span>Tutorials</span>
           </Link>
+          <Link href="/websites" className={`nav-item ${pathname.startsWith('/websites') ? 'active' : ''}`}>
+            <Globe size={20} />
+            <span>Websites</span>
+          </Link>
+          {user.role === 'admin' && (
+            <Link href="/nitch" className={`nav-item ${pathname.startsWith('/nitch') ? 'active' : ''}`}>
+              <Hash size={20} />
+              <span>Nitch</span>
+            </Link>
+          )}
         </nav>
 
         <div className="sidebar-footer">

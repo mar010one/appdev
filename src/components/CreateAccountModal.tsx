@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Plus, X, User, Mail, Globe, Phone, ShieldCheck,
   Building2, Key, Eye, EyeOff, FileText, File, FileImage, Upload,
@@ -10,7 +11,7 @@ import { addAccount, addCompanyName } from '@/lib/actions';
 import ModalPortal from './ModalPortal';
 
 function RevealInput({ name, placeholder }: { name: string; placeholder?: string }) {
-  const [revealed, setRevealed] = useState(false);
+  const [revealed, setRevealed] = useState(true);
   return (
     <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
       <input
@@ -49,6 +50,7 @@ const iconStyle = (accent = false): import('react').CSSProperties => ({
 });
 
 export default function CreateAccountModal({ companies = [] }: { companies?: any[] }) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [formEl, setFormEl] = useState<HTMLFormElement | null>(null);
@@ -108,6 +110,7 @@ export default function CreateAccountModal({ companies = [] }: { companies?: any
       setIsOpen(false);
       setFiles([]);
       setSelectedCompany('');
+      router.refresh();
     } else {
       alert(result.error || 'Something went wrong');
     }

@@ -69,6 +69,8 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
   const [versionNumber, setVersionNumber] = useState(suggestNextVersion(versions));
   const [changelog, setChangelog] = useState('');
   const [aabFile, setAabFile] = useState<File | null>(null);
+  const [aabExternalLink, setAabExternalLink] = useState('');
+  const [aabInputMode, setAabInputMode] = useState<'file' | 'link'>('file');
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [iconPreview, setIconPreview] = useState<string | null>(null);
   const [promoFile, setPromoFile] = useState<File | null>(null);
@@ -101,7 +103,7 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
       const cur = versions[i];
       const prev = versions[i + 1];
       const hints: string[] = [];
-      if (cur.icon_path)  hints.push('New icon');
+      if (cur.icon_path) hints.push('New icon');
       if (cur.promo_path) hints.push('New promo graphic');
       if (cur.screenshots && cur.screenshots.length) {
         const prevCount = prev?.screenshots?.length ?? 0;
@@ -150,6 +152,8 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
     setVersionNumber(suggestNextVersion(versions));
     setChangelog('');
     setAabFile(null);
+    setAabExternalLink('');
+    setAabInputMode('file');
     setIconFile(null);
     setIconPreview(null);
     setPromoFile(null);
@@ -169,8 +173,9 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
     fd.set('versionNumber', versionNumber.trim());
     fd.set('changelog', changelog);
     fd.set('updateAppAssets', updateAppAssets ? '1' : '0');
-    if (aabFile)   fd.set('file', aabFile);
-    if (iconFile)  fd.set('iconSmall', iconFile);
+    if (aabInputMode === 'file' && aabFile) fd.set('file', aabFile);
+    if (aabInputMode === 'link' && aabExternalLink.trim()) fd.set('fileExternalLink', aabExternalLink.trim());
+    if (iconFile) fd.set('iconSmall', iconFile);
     if (promoFile) fd.set('iconLarge', promoFile);
     shotFiles.forEach((f, i) => fd.append(`screenshot_${i}`, f));
 
@@ -265,16 +270,89 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
               </div>
               <div className="input-field">
                 <label>AAB / IPA Binary</label>
-                <label className="aab-drop">
-                  <Upload size={18} />
-                  <span>{aabFile ? aabFile.name : 'Choose file…'}</span>
-                  <input
-                    ref={aabInputRef}
-                    type="file"
-                    onChange={handleAabChange}
-                    accept=".aab,.ipa,.apk,application/octet-stream"
-                  />
-                </label>
+                <div className="aab-mode-toggle" style={{ marginBottom: 8 }}>
+                  <button
+                    type="button"
+                    className={`aab-mode-btn ${aabInputMode === 'file' ? 'active' : ''}`}
+                    onClick={() => { setAabInputMode('file'); setAabExternalLink(''); }}
+                  >
+                    <Upload size={13} /> Upload file
+                  </button>
+                  <button
+                    type="button"
+                    className={`aab-mode-btn ${aabInputMode === 'link' ? 'active' : ''}`}
+                    onClick={() => { setAabInputMode('link'); setAabFile(null); if (aabInputRef.current) aabInputRef.current.value = ''; }}
+                  >
+                    <ExternalLink size={13} /> Paste link
+                  </button>
+                </div>
+                {aabInputMode === 'file' ? (
+                  aabFile ? (
+                    <div className="aab-drop aab-drop-has-file">
+                      <Upload size={18} />
+                      <span className="aab-drop-name">{aabFile.name}</span>
+                      <button
+                        type="button"
+                        className="aab-drop-remove"
+                        onClick={() => { setAabFile(null); if (aabInputRef.current) aabInputRef.current.value = ''; }}
+                        title="Remove"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="aab-drop">
+                      <Upload size={18} />
+                      <span>Choose file…</span>
+                      <input
+                        ref={aabInputRef}
+                        type="file"
+                        onChange={handleAabChange}
+                        accept=".aab,.ipa,.apk,application/octet-stream"
+                      />
+                    </label>
+                  )
+                ) : (
+                  <div className="aab-link-section aab-link-section-compact">
+                    <div className="aab-link-hint" style={{ marginBottom: 6 }}>
+                      Supabase limit is 50 MB — upload to SendSpace or MediaFire and paste the link.
+                    </div>
+                    <div className="aab-link-row">
+                      <div className="aab-link-input-wrap">
+                        <ExternalLink size={14} className="aab-link-icon" />
+                        <input
+                          type="url"
+                          className="aab-link-input"
+                          placeholder="Paste SendSpace or MediaFire link…"
+                          value={aabExternalLink}
+                          onChange={(e) => setAabExternalLink(e.target.value)}
+                        />
+                        {aabExternalLink && (
+                          <button
+                            type="button"
+                            className="aab-link-clear"
+                            onClick={() => setAabExternalLink('')}
+                          >
+                            <X size={13} />
+                          </button>
+                        )}
+                      </div>
+                      <a
+                        href="https://www.sendspace.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="aab-host-btn sendspace"
+                      >
+                        <Upload size={13} /> SendSpace
+                      </a>
+                    </div>
+                    {aabExternalLink && (
+                      <div className="aab-link-preview">
+                        <Check size={12} color="#22c55e" /> Link ready
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

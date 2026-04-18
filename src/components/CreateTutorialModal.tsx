@@ -5,7 +5,7 @@ import { BookOpen, ExternalLink, Plus, Upload, X } from 'lucide-react';
 import ModalPortal from './ModalPortal';
 import { addTutorial } from '@/lib/actions';
 
-export default function CreateTutorialModal() {
+export default function CreateTutorialModal({ onAdd }: { onAdd?: (t: any) => void }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [type, setType] = useState<'link' | 'upload'>('link');
@@ -26,6 +26,8 @@ export default function CreateTutorialModal() {
     setIsPending(false);
     if (result.success) {
       setIsOpen(false);
+      setFileName('');
+      if (result.data) onAdd?.(result.data);
     } else {
       alert(result.error || 'Something went wrong');
     }
