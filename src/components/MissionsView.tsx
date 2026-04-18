@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import {
   CalendarDays,
   CheckCircle2,
@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import ModalPortal from '@/components/ModalPortal';
 import { addMission, deleteMission, toggleMission, updateMission, type Mission } from '@/lib/actions';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, type AuthUser } from '@/lib/auth';
 
 const TEAM_MEMBERS = ['marwan', 'ilyass', 'abdsamad'];
 
@@ -547,7 +547,11 @@ function AddMissionModal({
   onSubmit: (formData: FormData) => Promise<void>;
 }) {
   const [loading, setLoading] = useState(false);
-  const user = typeof window !== 'undefined' ? getCurrentUser() : null;
+  const [user, setUser] = useState<AuthUser | null>(null);
+
+  useEffect(() => {
+    getCurrentUser().then(setUser);
+  }, []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
