@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import PreviewModal from '@/components/PreviewModal';
 import EditAccountModal from './EditAccountModal';
+import AccountShareLinkButton from './AccountShareLinkButton';
 import { deleteAccount, updateAccountStatus } from '@/lib/actions';
 
 type StatusFilter = 'all' | 'active' | 'closed';
@@ -372,6 +373,7 @@ export default function AccountList({ initialAccounts }: { initialAccounts: any[
 
             {/* Actions */}
             <div className="account-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '7px', alignItems: 'center' }}>
+              <AccountShareLinkButton accountId={acc.id} />
               <EditAccountModal account={acc} onUpdate={handleAccountUpdate} />
               <button
                 onClick={() => handleDelete(acc.id, acc.developer_name)}

@@ -175,6 +175,45 @@ export async function getAccountById(id: number) {
   };
 }
 
+export async function getAccountSharePackage(id: number) {
+  const account = await getAccountById(id);
+  if (!account) return null;
+
+  let company: any = null;
+  const linked = (account as any).linkedCompanies?.[0];
+  if (linked?.id) {
+    const { data } = await supabase
+      .from('companies')
+      .select('*, company_documents(*)')
+      .eq('id', linked.id)
+      .single();
+    if (data) {
+      company = {
+        ...data,
+        documents: data.company_documents || [],
+        company_documents: undefined,
+      };
+    }
+  } else if (account.company_name) {
+    const { data } = await supabase
+      .from('companies')
+      .select('*, company_documents(*)')
+      .eq('name', account.company_name)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (data) {
+      company = {
+        ...data,
+        documents: data.company_documents || [],
+        company_documents: undefined,
+      };
+    }
+  }
+
+  return { account, company };
+}
+
 export async function addAccount(formData: FormData): Promise<ActionResponse> {
   try {
     const type = formData.get('type')?.toString() || 'google_play';
@@ -1633,6 +1672,134 @@ export async function deleteWebsite(id: number): Promise<ActionResponse> {
     return { success: true };
   } catch (error: any) {
     return { error: error.message };
+  }
+}
+
+// ── Notes ─────────────────────────────────────────────────────────────────────
+
+export type Note = {
+  id: number;
+  title: string;
+  content: string | null;
+  category: string | null;
+  color: string | null;
+  is_shared: boolean;
+  shared_with: string | null;
+  owner_email: string;
+  created_at: string;
+  updated_at: string;
+};
+
+function parseSharedEmails(raw: string): string {
+  return raw
+    .split(/[,;\s]+/)
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => s && s.includes('@'))
+    .join(',');
+}
+
+export async function getNotes(viewerEmail?: string): Promise<Note[]> {
+  const email = (viewerEmail || '').trim().toLowerCase();
+  const { data, error } = await supabase
+    .from('notes')
+    .select('*')
+    .order('updated_at', { ascending: false });
+  if (error) {
+    console.error('getNotes error:', error);
+    return [];
+  }
+  const notes = (data || []) as Note[];
+  if (!email) return notes;
+  return notes.filter((n) => {
+    if ((n.owner_email || '').toLowerCase() === email) return true;
+    if (!n.is_shared) return false;
+    const shared = (n.shared_with || '').trim();
+    if (!shared) return true; // shared with everyone
+    return shared
+      .toLowerCase()
+      .split(/[,;\s]+/)
+      .map((s) => s.trim())
+      .includes(email);
+  });
+}
+
+export async function addNote(formData: FormData): Promise<ActionResponse<Note>> {
+  try {
+    const title = formData.get('title')?.toString().trim() || '';
+    const content = formData.get('content')?.toString() || '';
+    const category = formData.get('category')?.toString() || '';
+    const color = formData.get('color')?.toString() || 'default';
+    const is_shared = formData.get('is_shared') === 'on' || formData.get('is_shared') === 'true';
+    const shared_with = parseSharedEmails(formData.get('shared_with')?.toString() || '');
+    const owner_email = (formData.get('owner_email')?.toString() || '').trim().toLowerCase();
+
+    if (!title) return { error: 'Title is required.' };
+    if (!owner_email) return { error: 'Missing user — please sign in again.' };
+
+    const { data: inserted, error } = await supabase
+      .from('notes')
+      .insert({ title, content, category, color, is_shared, shared_with, owner_email })
+      .select()
+      .single();
+    if (error) throw error;
+
+    revalidatePath('/notes');
+    return { success: true, data: inserted as Note };
+  } catch (error: any) {
+    return { error: error.message || 'Failed to add note.' };
+  }
+}
+
+export async function updateNote(id: number, formData: FormData): Promise<ActionResponse<Note>> {
+  try {
+    const title = formData.get('title')?.toString().trim() || '';
+    const content = formData.get('content')?.toString() || '';
+    const category = formData.get('category')?.toString() || '';
+    const color = formData.get('color')?.toString() || 'default';
+    const is_shared = formData.get('is_shared') === 'on' || formData.get('is_shared') === 'true';
+    const shared_with = parseSharedEmails(formData.get('shared_with')?.toString() || '');
+    const editor_email = (formData.get('editor_email')?.toString() || '').trim().toLowerCase();
+
+    if (!title) return { error: 'Title is required.' };
+
+    const { data: existing, error: fetchError } = await supabase
+      .from('notes').select('owner_email').eq('id', id).single();
+    if (fetchError) throw fetchError;
+    if (!existing) return { error: 'Note not found.' };
+    if (editor_email && existing.owner_email.toLowerCase() !== editor_email) {
+      return { error: 'Only the owner can edit this note.' };
+    }
+
+    const { data: updated, error } = await supabase
+      .from('notes')
+      .update({ title, content, category, color, is_shared, shared_with, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+
+    revalidatePath('/notes');
+    return { success: true, data: updated as Note };
+  } catch (error: any) {
+    return { error: error.message || 'Failed to update note.' };
+  }
+}
+
+export async function deleteNote(id: number, requesterEmail?: string): Promise<ActionResponse> {
+  try {
+    if (requesterEmail) {
+      const { data: existing } = await supabase
+        .from('notes').select('owner_email').eq('id', id).single();
+      if (existing && existing.owner_email.toLowerCase() !== requesterEmail.trim().toLowerCase()) {
+        return { error: 'Only the owner can delete this note.' };
+      }
+    }
+    const { error } = await supabase.from('notes').delete().eq('id', id);
+    if (error) throw error;
+    revalidatePath('/notes');
+    return { success: true };
+  } catch (error: any) {
+    return { error: error.message || 'Failed to delete note.' };
   }
 }
 

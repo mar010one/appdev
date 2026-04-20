@@ -6,6 +6,7 @@ import AppList from '@/components/AppList';
 import EditAccountModal from '@/components/EditAccountModal';
 import CreateAppModal from '@/components/CreateAppModal';
 import AccountSecureInfo from '@/components/AccountSecureInfo';
+import AccountShareLinkButton from '@/components/AccountShareLinkButton';
 
 export default async function AccountDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -61,6 +62,7 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
           </div>
         </div>
         <div className="account-hero-actions">
+          <AccountShareLinkButton accountId={account.id} />
           <EditAccountModal account={account} allCompanies={allCompanies} />
           <CreateAppModal accounts={[account]} />
         </div>

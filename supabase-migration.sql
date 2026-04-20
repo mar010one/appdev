@@ -184,6 +184,22 @@ CREATE TABLE IF NOT EXISTS nitch (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS notes (
+  id BIGSERIAL PRIMARY KEY,
+  title TEXT NOT NULL,
+  content TEXT,
+  category TEXT,
+  color TEXT DEFAULT 'default',
+  is_shared BOOLEAN DEFAULT FALSE,
+  shared_with TEXT,
+  owner_email TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS notes_owner_email_idx ON notes(owner_email);
+CREATE INDEX IF NOT EXISTS notes_updated_at_idx ON notes(updated_at DESC);
+
 -- ── Disable RLS (internal tool — no user-specific row filtering needed) ────────
 
 ALTER TABLE accounts DISABLE ROW LEVEL SECURITY;
@@ -201,6 +217,7 @@ ALTER TABLE tutorials DISABLE ROW LEVEL SECURITY;
 ALTER TABLE missions DISABLE ROW LEVEL SECURITY;
 ALTER TABLE websites DISABLE ROW LEVEL SECURITY;
 ALTER TABLE nitch DISABLE ROW LEVEL SECURITY;
+ALTER TABLE notes DISABLE ROW LEVEL SECURITY;
 
 -- ── Grant anon role full access (allows publishable key to work) ───────────────
 

@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import {
   Plus, X, User, Mail, Globe, Phone, ShieldCheck,
   Building2, Key, Eye, EyeOff, FileText, File, FileImage, Upload,
-  ChevronDown, Check, Loader2, Sparkles, CreditCard,
+  ChevronDown, Check, Loader2, Sparkles, CreditCard, Calendar,
+  AlertTriangle, Save, Trash2,
 } from 'lucide-react';
 import { addAccount, addCompanyName } from '@/lib/actions';
 import { uploadFilesInForm } from '@/lib/upload-client';
@@ -29,6 +30,55 @@ function RevealInput({ name, placeholder }: { name: string; placeholder?: string
       >
         {revealed ? <EyeOff size={15} /> : <Eye size={15} />}
       </button>
+    </div>
+  );
+}
+
+function formatExpiry(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 4);
+  if (digits.length === 0) return '';
+  if (digits.length === 1) {
+    // Month leading 2-9 means single-digit month like 3 → auto-prefix 0
+    if (parseInt(digits, 10) >= 2) return `0${digits}/`;
+    return digits;
+  }
+  const mm = digits.slice(0, 2);
+  const yy = digits.slice(2);
+  return yy.length ? `${mm}/${yy}` : `${mm}`;
+}
+
+function ExpiryInput({ name, value, onChange }: {
+  name: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+      <Calendar size={14} style={{ position: 'absolute', left: '13px', color: 'var(--accent)', opacity: 0.85, pointerEvents: 'none' }} />
+      <input
+        type="text"
+        name={name}
+        inputMode="numeric"
+        autoComplete="cc-exp"
+        placeholder="MM/YY"
+        value={value}
+        maxLength={5}
+        onChange={(e) => onChange(formatExpiry(e.target.value))}
+        onKeyDown={(e) => {
+          // Allow Backspace to also remove the trailing slash cleanly
+          if (e.key === 'Backspace' && value.endsWith('/')) {
+            e.preventDefault();
+            onChange(value.slice(0, -1));
+          }
+        }}
+        style={{
+          paddingLeft: '36px',
+          width: '100%',
+          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+          letterSpacing: '0.12em',
+          fontSize: '0.92rem',
+        }}
+      />
     </div>
   );
 }
@@ -70,6 +120,10 @@ export default function CreateAccountModal({ companies = [] }: { companies?: any
     companies.map(c => ({ id: c.id, name: c.name }))
   );
 
+  const [expiry, setExpiry] = useState('');
+  const [isDirty, setIsDirty] = useState(false);
+  const [showUnsaved, setShowUnsaved] = useState(false);
+
   // Sync when the server re-sends updated companies (e.g., after navigation)
   useEffect(() => {
     setLocalCompanies(prev => {
@@ -87,6 +141,7 @@ export default function CreateAccountModal({ companies = [] }: { companies?: any
       const existing = new Set(prev.map(f => f.name + f.size));
       return [...prev, ...arr.filter(f => !existing.has(f.name + f.size))];
     });
+    setIsDirty(true);
   }
 
   function removeFile(index: number) {
@@ -122,6 +177,9 @@ export default function CreateAccountModal({ companies = [] }: { companies?: any
       setIsOpen(false);
       setFiles([]);
       setSelectedCompany('');
+      setExpiry('');
+      setIsDirty(false);
+      setShowUnsaved(false);
       router.refresh();
     } else {
       alert(result.error || 'Something went wrong');
@@ -151,6 +209,22 @@ export default function CreateAccountModal({ companies = [] }: { companies?: any
     setPickerOpen(false);
     setShowCreatePopup(false);
     setNewCompanyInput('');
+    setExpiry('');
+    setIsDirty(false);
+    setShowUnsaved(false);
+  }
+
+  function requestClose() {
+    if (isDirty || files.length > 0 || selectedCompany || expiry) {
+      setShowUnsaved(true);
+    } else {
+      handleClose();
+    }
+  }
+
+  function saveFromPopup() {
+    setShowUnsaved(false);
+    if (formEl) formEl.requestSubmit();
   }
 
   return (
@@ -161,7 +235,7 @@ export default function CreateAccountModal({ companies = [] }: { companies?: any
       </button>
 
       <ModalPortal open={isOpen}>
-        <div className="modal-overlay" onClick={handleClose}>
+        <div className="modal-overlay" onClick={requestClose}>
           <div
             className="modal-content"
             style={{ maxWidth: '680px', borderRadius: '20px' }}
@@ -183,7 +257,7 @@ export default function CreateAccountModal({ companies = [] }: { companies?: any
                   <p className="text-muted" style={{ fontSize: '0.71rem', margin: '1px 0 0' }}>Developer identity & legal verification</p>
                 </div>
               </div>
-              <button className="modal-close" style={{ width: '32px', height: '32px' }} onClick={handleClose}>
+              <button className="modal-close" style={{ width: '32px', height: '32px' }} onClick={requestClose}>
                 <X size={16} />
               </button>
             </div>
@@ -192,6 +266,7 @@ export default function CreateAccountModal({ companies = [] }: { companies?: any
             <form
               ref={setFormEl}
               action={handleSubmit}
+              onInput={() => { if (!isDirty) setIsDirty(true); }}
               className="modal-body"
               style={{ padding: '18px 22px 20px', gap: '11px', display: 'flex', flexDirection: 'column' }}
             >
@@ -412,44 +487,65 @@ export default function CreateAccountModal({ companies = [] }: { companies?: any
               </div>
 
               {/* ── VCC Information ── */}
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', marginTop: '4px', paddingTop: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                  <CreditCard size={13} color="var(--accent)" />
-                  <span style={{ fontSize: '0.71rem', fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                    VCC Information
-                  </span>
-                  <span style={{ fontSize: '0.71rem', color: 'var(--muted)', fontWeight: 400, textTransform: 'none' }}>— virtual credit card</span>
+              <div
+                style={{
+                  marginTop: '6px',
+                  padding: '16px',
+                  borderRadius: '18px',
+                  background:
+                    'linear-gradient(145deg, rgba(234,179,8,0.07) 0%, rgba(234,179,8,0.02) 45%, rgba(255,255,255,0.02) 100%)',
+                  border: '1px solid rgba(234,179,8,0.18)',
+                  display: 'flex', flexDirection: 'column', gap: '12px',
+                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{
+                    width: '30px', height: '30px', borderRadius: '9px', flexShrink: 0,
+                    background: 'rgba(234,179,8,0.14)', border: '1px solid rgba(234,179,8,0.25)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <CreditCard size={15} color="var(--accent)" />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 700, letterSpacing: '-0.01em' }}>
+                      VCC Information
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--muted)', marginTop: '1px' }}>
+                      Virtual credit card — optional
+                    </div>
+                  </div>
                 </div>
 
-                <div className="grid-2" style={{ gap: '10px' }}>
-                  <div className="input-field">
-                    <label>Card Number</label>
-                    <RevealInput name="vccNumber" placeholder="•••• •••• •••• ••••" />
+                {/* Card Number — full width */}
+                <div className="input-field" style={{ margin: 0 }}>
+                  <label>Card Number</label>
+                  <RevealInput name="vccNumber" placeholder="•••• •••• •••• ••••" />
+                </div>
+
+                {/* Expiry + CVV — side by side */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div className="input-field" style={{ margin: 0 }}>
+                    <label>Expiry Date</label>
+                    <ExpiryInput name="vccExpiry" value={expiry} onChange={(v) => { setExpiry(v); setIsDirty(true); }} />
                   </div>
-                  <div className="input-field">
+                  <div className="input-field" style={{ margin: 0 }}>
                     <label>CVV</label>
                     <RevealInput name="vccCvv" placeholder="•••" />
                   </div>
                 </div>
 
-                <div className="grid-2" style={{ gap: '10px' }}>
-                  <div className="input-field">
-                    <label>Cardholder Name</label>
-                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                      <User size={14} style={iconStyle(true)} />
-                      <input type="text" name="vccHolder" placeholder="Name on card" style={{ paddingLeft: '36px', width: '100%' }} />
-                    </div>
-                  </div>
-                  <div className="input-field">
-                    <label>Expiry Date</label>
-                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                      <CreditCard size={14} style={iconStyle(true)} />
-                      <input type="text" name="vccExpiry" placeholder="MM/YY" maxLength={5} style={{ paddingLeft: '36px', width: '100%' }} />
-                    </div>
+                {/* Cardholder — full width */}
+                <div className="input-field" style={{ margin: 0 }}>
+                  <label>Cardholder Name</label>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <User size={14} style={iconStyle(true)} />
+                    <input type="text" name="vccHolder" placeholder="Name on card" style={{ paddingLeft: '36px', width: '100%' }} />
                   </div>
                 </div>
 
-                <div className="input-field">
+                {/* Note */}
+                <div className="input-field" style={{ margin: 0 }}>
                   <label>Note</label>
                   <textarea
                     name="vccNotes"
@@ -471,7 +567,7 @@ export default function CreateAccountModal({ companies = [] }: { companies?: any
                 type="button"
                 className="btn btn-secondary"
                 style={{ padding: '9px 18px', fontSize: '0.86rem', borderRadius: '12px' }}
-                onClick={handleClose}
+                onClick={requestClose}
               >
                 Cancel
               </button>
@@ -488,6 +584,112 @@ export default function CreateAccountModal({ companies = [] }: { companies?: any
             </div>
           </div>
         </div>
+
+        {/* ── Unsaved-changes confirm popup ── */}
+        {showUnsaved && (
+          <div
+            onClick={() => setShowUnsaved(false)}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 10000,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(8px)',
+              animation: 'fadeIn 0.2s ease',
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '100%', maxWidth: '420px',
+                background: 'linear-gradient(160deg, #1a1a23 0%, #0f0f14 100%)',
+                border: '1px solid rgba(234,179,8,0.25)', borderRadius: '22px',
+                padding: '24px 22px 20px',
+                boxShadow: '0 40px 100px -20px rgba(0,0,0,0.95), 0 0 60px -20px rgba(234,179,8,0.15)',
+                animation: 'modalScale 0.22s cubic-bezier(0.16,1,0.3,1)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '18px' }}>
+                <div style={{
+                  width: '44px', height: '44px', borderRadius: '13px', flexShrink: 0,
+                  background: 'rgba(234,179,8,0.14)',
+                  border: '1px solid rgba(234,179,8,0.32)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: '0 0 24px -6px rgba(234,179,8,0.4)',
+                }}>
+                  <AlertTriangle size={20} color="var(--accent)" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <h3 style={{ fontSize: '1.02rem', fontWeight: 800, margin: 0, letterSpacing: '-0.01em' }}>
+                    Unsaved changes
+                  </h3>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--muted)', margin: '4px 0 0', lineHeight: 1.5 }}>
+                    You have unsaved information in this form. What would you like to do?
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={saveFromPopup}
+                  disabled={isPending}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    padding: '12px 16px', borderRadius: '13px',
+                    border: 'none', cursor: isPending ? 'wait' : 'pointer',
+                    background: 'linear-gradient(135deg, #eab308, #ca8a04)',
+                    color: '#000', fontWeight: 700, fontSize: '0.88rem',
+                    fontFamily: 'inherit',
+                    boxShadow: '0 6px 22px -6px rgba(234,179,8,0.5)',
+                    transition: 'transform 0.15s',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-1px)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
+                >
+                  {isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                  <span>{isPending ? 'Saving…' : 'Save and close'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowUnsaved(false)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    padding: '12px 16px', borderRadius: '13px',
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    color: 'var(--foreground)', fontWeight: 600, fontSize: '0.88rem',
+                    fontFamily: 'inherit', cursor: 'pointer',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
+                >
+                  <ShieldCheck size={16} color="var(--accent)" />
+                  <span>Keep editing</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    padding: '12px 16px', borderRadius: '13px',
+                    background: 'rgba(239,68,68,0.08)',
+                    border: '1px solid rgba(239,68,68,0.22)',
+                    color: '#f87171', fontWeight: 600, fontSize: '0.88rem',
+                    fontFamily: 'inherit', cursor: 'pointer',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(239,68,68,0.14)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(239,68,68,0.08)')}
+                >
+                  <Trash2 size={16} />
+                  <span>Discard and close</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Create Company Mini Popup ── */}
         {showCreatePopup && (
