@@ -672,6 +672,7 @@ select option {
   left: 0;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -781,6 +782,7 @@ select option {
 .fullscreen-content {
   width: 100vw;
   height: 100vh;
+  height: 100dvh; /* dvh keeps footer on-screen when mobile/tablet chrome toggles */
   max-width: none !important;
   max-height: none !important;
   border-radius: 0;
@@ -2174,6 +2176,39 @@ select option {
   .fullscreen-content {
     --modal-pad-x: 32px;
   }
+
+  /* Tighten wizard chrome on laptop/tablet so the sticky footer's
+     Cancel + Next buttons never fall below the viewport */
+  .fullscreen-content .modal-header { padding-top: 20px; padding-bottom: 20px; }
+  .fullscreen-content .modal-header-modern { padding-bottom: 18px; }
+  .modal-title-modern { font-size: 1.5rem; }
+  .app-icon-preview-modern { width: 56px; height: 56px; border-radius: 16px; }
+  .stepper-container { padding-top: 20px; padding-bottom: 20px; }
+  .fullscreen-content .modal-body { padding-top: 24px; padding-bottom: 28px; }
+  .section-title { margin-bottom: 20px; }
+  .section-title h3 { font-size: 1.5rem; }
+  .step-description { margin-bottom: 24px; font-size: 1rem; }
+  .sticky-footer { padding-top: 14px; padding-bottom: 14px; }
+  .btn-next-v2 { min-width: 150px; padding: 8px 8px 8px 18px; }
+  .btn-next-v2-icon { width: 30px; height: 30px; }
+  .btn-next-v2-label { font-size: 0.85rem; }
+}
+
+/* Landscape tablet / small laptop — keep footer buttons visible without
+   forcing full mobile stacking */
+@media (max-width: 1024px) {
+  .fullscreen-content { --modal-pad-x: 24px; }
+  .fullscreen-content .modal-header { padding-top: 16px; padding-bottom: 16px; }
+  .stepper-container { padding: 16px 20px; overflow-x: auto; }
+  .step-item { min-width: 120px; gap: 10px; }
+  .step-circle { width: 38px; height: 38px; font-size: 0.9rem; }
+  .step-label { font-size: 0.66rem; letter-spacing: 1.2px; }
+  .step-line { top: 19px; }
+  .sticky-footer { padding-top: 12px; padding-bottom: 12px; gap: 12px; }
+  .sticky-footer .step-dots { display: none; } /* reclaim space for buttons */
+  .btn-next-v2 { min-width: auto; padding: 8px 8px 8px 16px; gap: 10px; }
+  .btn-next-v2-sublabel { font-size: 0.58rem; letter-spacing: 1px; }
+  .btn-next-v2-label { font-size: 0.8rem; }
 }
 
 @media (max-width: 768px) {
