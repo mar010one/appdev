@@ -259,6 +259,14 @@ export async function addAccount(formData: FormData): Promise<ActionResponse> {
     if (error) throw error;
     const accountId = account.id;
 
+    if (companyName.trim()) {
+      await supabase
+        .from('companies')
+        .update({ linked_account_id: accountId, status: 'used' })
+        .eq('name', companyName.trim())
+        .is('linked_account_id', null);
+    }
+
     for (let i = 0; i < documents.length; i++) {
       const doc = documents[i] as any;
       if (!doc) continue;
@@ -283,6 +291,7 @@ export async function addAccount(formData: FormData): Promise<ActionResponse> {
     }
 
     revalidatePath('/accounts');
+    revalidatePath('/companies');
     revalidatePath('/');
     return { success: true };
   } catch (error) {

@@ -3,17 +3,19 @@ import AccountList from "@/components/AccountList";
 import CreateAccountModal from "@/components/CreateAccountModal";
 
 export default async function AccountsPage() {
-  let accounts: any[] = [];
-  let companies: any[] = [];
-  try {
-    accounts = await getAccounts();
-  } catch (error) {
-    console.error("Failed to load accounts:", error);
+  const [accountsResult, companiesResult] = await Promise.allSettled([
+    getAccounts(),
+    getCompanies(),
+  ]);
+  const accounts: any[] =
+    accountsResult.status === 'fulfilled' ? accountsResult.value : [];
+  const companies: any[] =
+    companiesResult.status === 'fulfilled' ? companiesResult.value : [];
+  if (accountsResult.status === 'rejected') {
+    console.error('Failed to load accounts:', accountsResult.reason);
   }
-  try {
-    companies = await getCompanies();
-  } catch (error) {
-    console.error("Failed to load companies:", error);
+  if (companiesResult.status === 'rejected') {
+    console.error('Failed to load companies:', companiesResult.reason);
   }
 
   return (
@@ -23,7 +25,7 @@ export default async function AccountsPage() {
           <h1 style={{ fontSize: '2.5rem', fontWeight: 800 }}>Client Accounts</h1>
           <p className="text-muted" style={{ fontSize: '1.1rem' }}>Manage your high-level developer credentials and verification documents.</p>
         </div>
-        <CreateAccountModal companies={companies} />
+        <CreateAccountModal companies={companies.filter((c: any) => !c.linked_account_id)} />
       </header>
 
       <div className="accounts-dashboard">
