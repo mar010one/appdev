@@ -21,11 +21,12 @@ export default async function PublicSharePage({ params }: { params: Promise<{ id
   const appId = parseInt(id, 10);
   if (Number.isNaN(appId)) return notFound();
 
-  const app = await getAppById(appId);
+  const [app, versions, listingVersions] = await Promise.all([
+    getAppById(appId),
+    getVersions(appId) as Promise<any[]>,
+    getListingVersions(appId),
+  ]);
   if (!app) return notFound();
-
-  const versions = (await getVersions(appId)) as any[];
-  const listingVersions = await getListingVersions(appId);
 
   return (
     <>

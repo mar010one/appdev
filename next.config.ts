@@ -17,6 +17,9 @@ const nextConfig: NextConfig = {
       // Note: Vercel Hobby plan caps at 4.5 MB; upgrade to Pro for larger uploads.
       bodySizeLimit: "200mb",
     },
+    // Tree-shake large icon / supabase packages so only the symbols we
+    // actually import end up in the client bundle.
+    optimizePackageImports: ['lucide-react', '@supabase/ssr', '@supabase/supabase-js'],
   },
 };
 

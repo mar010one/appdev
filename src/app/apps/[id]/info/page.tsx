@@ -7,10 +7,11 @@ export default async function AppInfoPage({ params }: { params: Promise<{ id: st
   const appId = parseInt(id, 10);
   if (Number.isNaN(appId)) return notFound();
 
-  const app = await getAppById(appId);
+  const [app, listingVersions] = await Promise.all([
+    getAppById(appId),
+    getListingVersions(appId),
+  ]);
   if (!app) return notFound();
-
-  const listingVersions = await getListingVersions(appId);
 
   return <AppInfoView app={app} listingVersions={listingVersions} />;
 }

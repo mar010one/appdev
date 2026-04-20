@@ -16,24 +16,37 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const isPublic = pathname.startsWith('/share');
   const isLogin = pathname.startsWith('/login');
 
+  // Fetch the user once on mount. Re-fetching on every pathname change
+  // forces a Supabase auth round-trip on every client navigation, which
+  // is what makes the app feel slow when clicking between pages.
   useEffect(() => {
     if (isPublic || isLogin) {
       setChecked(true);
       return;
     }
+    let cancelled = false;
     getCurrentUser().then((current) => {
+      if (cancelled) return;
       if (!current) {
         router.replace('/login');
-        return;
-      }
-      if (!canAccess(current, pathname)) {
-        router.replace('/');
         return;
       }
       setUser(current);
       setChecked(true);
     });
-  }, [pathname, isPublic, isLogin, router]);
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Cheap client-side access check on every navigation — no network call.
+  useEffect(() => {
+    if (isPublic || isLogin || !user) return;
+    if (!canAccess(user, pathname)) {
+      router.replace('/');
+    }
+  }, [pathname, user, isPublic, isLogin, router]);
 
   useEffect(() => {
     setSidebarOpen(false);

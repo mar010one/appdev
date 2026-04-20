@@ -3,8 +3,7 @@ import CreateAppModal from "@/components/CreateAppModal";
 import AppList from "@/components/AppList";
 
 export default async function AppsPage() {
-  const accounts = (await getAccounts()) as any[];
-  const apps = (await getApps()) as any[];
+  const [accounts, apps] = (await Promise.all([getAccounts(), getApps()])) as [any[], any[]];
 
   return (
     <div className="page-container">

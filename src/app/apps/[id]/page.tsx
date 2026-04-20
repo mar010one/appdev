@@ -7,10 +7,11 @@ export default async function AppDetailsPage({ params }: { params: Promise<{ id:
   const appId = parseInt(id, 10);
   if (Number.isNaN(appId)) return notFound();
 
-  const app = await getAppById(appId);
+  const [app, versions] = await Promise.all([
+    getAppById(appId),
+    getVersions(appId) as Promise<any[]>,
+  ]);
   if (!app) return notFound();
-
-  const versions = (await getVersions(appId)) as any[];
 
   return <AppManageView app={app} versions={versions} />;
 }
