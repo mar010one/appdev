@@ -59,7 +59,7 @@ function ExpiryInput({ name, value, onChange }: {
         type="text"
         name={name}
         inputMode="numeric"
-        autoComplete="cc-exp"
+        autoComplete="off"
         placeholder="MM/YY"
         value={value}
         maxLength={5}

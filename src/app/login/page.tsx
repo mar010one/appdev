@@ -33,7 +33,7 @@ export default function LoginPage() {
 
   return (
     <div className="login-shell">
-      <form className="login-card glass-card" onSubmit={handleSubmit}>
+      <form className="login-card glass-card" onSubmit={handleSubmit} autoComplete="off">
         <div className="login-header">
           <div className="logo-icon">A</div>
           <h1>
@@ -48,7 +48,7 @@ export default function LoginPage() {
             <Mail size={16} />
             <input
               type="email"
-              autoComplete="email"
+              autoComplete="off"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
@@ -63,7 +63,7 @@ export default function LoginPage() {
             <Lock size={16} />
             <input
               type="password"
-              autoComplete="current-password"
+              autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
