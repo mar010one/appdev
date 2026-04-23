@@ -24,7 +24,7 @@ export default function AddNoteModal({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
-  const [isShared, setIsShared] = useState(false);
+  const [isShared, setIsShared] = useState(true);
   const [color, setColor] = useState('default');
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {

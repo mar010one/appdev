@@ -1707,8 +1707,7 @@ function parseSharedEmails(raw: string): string {
     .join(',');
 }
 
-export async function getNotes(viewerEmail?: string): Promise<Note[]> {
-  const email = (viewerEmail || '').trim().toLowerCase();
+export async function getNotes(_viewerEmail?: string): Promise<Note[]> {
   const { data, error } = await supabase
     .from('notes')
     .select('*')
@@ -1717,19 +1716,7 @@ export async function getNotes(viewerEmail?: string): Promise<Note[]> {
     console.error('getNotes error:', error);
     return [];
   }
-  const notes = (data || []) as Note[];
-  if (!email) return notes;
-  return notes.filter((n) => {
-    if ((n.owner_email || '').toLowerCase() === email) return true;
-    if (!n.is_shared) return false;
-    const shared = (n.shared_with || '').trim();
-    if (!shared) return true; // shared with everyone
-    return shared
-      .toLowerCase()
-      .split(/[,;\s]+/)
-      .map((s) => s.trim())
-      .includes(email);
-  });
+  return (data || []) as Note[];
 }
 
 export async function addNote(formData: FormData): Promise<ActionResponse<Note>> {
