@@ -539,6 +539,14 @@ export async function addVersion(
       const updates: Record<string, string> = {};
       if (iconPath) updates.icon_small_path = iconPath;
       if (promoPath) updates.icon_large_path = promoPath;
+
+      const name = (formData.get('name') as string | null)?.trim();
+      const shortDescription = formData.get('shortDescription') as string | null;
+      const longDescription = formData.get('longDescription') as string | null;
+      if (name) updates.name = name;
+      if (shortDescription !== null) updates.short_description = shortDescription;
+      if (longDescription !== null) updates.long_description = longDescription;
+
       if (Object.keys(updates).length) {
         await supabase.from('apps').update(updates).eq('id', appId);
       }

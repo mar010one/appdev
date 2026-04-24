@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Check, Loader2, CircleDashed, CheckCircle2, XCircle, ShieldAlert, Ban, Clock, Lock } from 'lucide-react';
 import { updateAppStatus, type AppStatus } from '@/lib/actions';
 
@@ -42,20 +43,58 @@ export default function AppStatusMenu({
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [current, setCurrent] = useState(status || 'draft');
+  const [coords, setCoords] = useState<{ top: number; left: number; width: number } | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => setCurrent(status || 'draft'), [status]);
 
-  // Close on outside click
+  // Position the dropdown below the trigger, flipping upward if there's no room
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) return;
+    function place() {
+      const t = triggerRef.current;
+      if (!t) return;
+      const rect = t.getBoundingClientRect();
+      const menuW = 260;
+      const menuH = menuRef.current?.offsetHeight ?? 360;
+      let left = rect.left;
+      if (left + menuW > window.innerWidth - 12) left = window.innerWidth - menuW - 12;
+      if (left < 12) left = 12;
+      let top = rect.bottom + 8;
+      if (top + menuH > window.innerHeight - 12) {
+        top = Math.max(12, rect.top - menuH - 8);
+      }
+      setCoords({ top, left, width: menuW });
+    }
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [open]);
+
+  // Close on outside click / escape
   useEffect(() => {
     if (!open) return;
     function onDocClick(e: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      if (wrapperRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false);
     }
     document.addEventListener('mousedown', onDocClick);
-    return () => document.removeEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onKey);
+    };
   }, [open]);
 
   async function pick(value: AppStatus) {
@@ -68,40 +107,50 @@ export default function AppStatusMenu({
     setOpen(false);
   }
 
+  const menu = open && coords && typeof document !== 'undefined' ? createPortal(
+    <div
+      ref={menuRef}
+      className="status-menu"
+      role="menu"
+      style={{ top: coords.top, left: coords.left, width: coords.width }}
+    >
+      {STATUS_OPTIONS.map(opt => (
+        <button
+          key={opt.value}
+          type="button"
+          role="menuitem"
+          className={`status-menu-item status-${opt.value} ${opt.value === current ? 'is-current' : ''}`}
+          onClick={() => pick(opt.value)}
+        >
+          <span className="status-menu-item-icon">{statusIcon(opt.value, 14)}</span>
+          <span className="status-menu-item-text">
+            <strong>{opt.label}</strong>
+            <small>{opt.description}</small>
+          </span>
+          {opt.value === current && <Check size={14} className="status-menu-check" />}
+        </button>
+      ))}
+    </div>,
+    document.body,
+  ) : null;
+
   return (
     <div className={`status-menu-wrap ${size}`} ref={wrapperRef}>
       <button
+        ref={triggerRef}
         type="button"
-        className={`status-pill status-${current} ${pending ? 'is-pending' : ''}`}
+        className={`status-pill status-${current} ${pending ? 'is-pending' : ''} ${open ? 'is-open' : ''}`}
         onClick={() => setOpen(o => !o)}
         disabled={pending}
         title="Change app status"
+        aria-haspopup="menu"
+        aria-expanded={open}
       >
         {pending ? <Loader2 size={12} className="animate-spin" /> : statusIcon(current)}
         <span>{statusLabel(current)}</span>
         <ChevronDown size={12} className="status-chev" />
       </button>
-
-      {open && (
-        <div className="status-menu" role="menu">
-          {STATUS_OPTIONS.map(opt => (
-            <button
-              key={opt.value}
-              type="button"
-              role="menuitem"
-              className={`status-menu-item status-${opt.value} ${opt.value === current ? 'is-current' : ''}`}
-              onClick={() => pick(opt.value)}
-            >
-              <span className="status-menu-item-icon">{statusIcon(opt.value, 14)}</span>
-              <span className="status-menu-item-text">
-                <strong>{opt.label}</strong>
-                <small>{opt.description}</small>
-              </span>
-              {opt.value === current && <Check size={14} className="status-menu-check" />}
-            </button>
-          ))}
-        </div>
-      )}
+      {menu}
     </div>
   );
 }

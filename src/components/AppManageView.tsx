@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   ArrowLeft, Smartphone, Hash, Plus, Loader2, Check, FileDown, Upload,
   Image as ImageIcon, FileImage, X, Trash2, History, GitCommit, Sparkles,
-  ExternalLink, Share2, Copy, Info, Edit3, RefreshCw,
+  ExternalLink, Share2, Copy, Info, Edit3, RefreshCw, Type, AlignLeft,
 } from 'lucide-react';
 import EditAppModal from './EditAppModal';
 import AppStatusMenu from './AppStatusMenu';
@@ -68,6 +68,9 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
 
   // ---- New version form state ----
   const [versionNumber, setVersionNumber] = useState(suggestNextVersion(versions));
+  const [titleEdit, setTitleEdit] = useState(app.name || '');
+  const [shortDesc, setShortDesc] = useState(app.short_description || '');
+  const [longDesc, setLongDesc] = useState(app.long_description || '');
   const [changelog, setChangelog] = useState('');
   const [aabFile, setAabFile] = useState<File | null>(null);
   const [aabExternalLink, setAabExternalLink] = useState('');
@@ -151,6 +154,9 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
 
   function resetForm() {
     setVersionNumber(suggestNextVersion(versions));
+    setTitleEdit(app.name || '');
+    setShortDesc(app.short_description || '');
+    setLongDesc(app.long_description || '');
     setChangelog('');
     setAabFile(null);
     setAabExternalLink('');
@@ -173,6 +179,9 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
     fd.set('appId', String(app.id));
     fd.set('versionNumber', versionNumber.trim());
     fd.set('changelog', changelog);
+    fd.set('name', titleEdit.trim());
+    fd.set('shortDescription', shortDesc);
+    fd.set('longDescription', longDesc);
     fd.set('updateAppAssets', updateAppAssets ? '1' : '0');
     if (aabInputMode === 'file' && aabFile) fd.set('file', aabFile);
     if (aabInputMode === 'link' && aabExternalLink.trim()) fd.set('fileExternalLink', aabExternalLink.trim());
@@ -375,6 +384,56 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
                   </div>
                 )}
               </div>
+            </div>
+
+            <div className="input-field">
+              <label>Title</label>
+              <div className="input-with-icon-large">
+                <Type size={20} />
+                <input
+                  type="text"
+                  placeholder="App title shown on the listing"
+                  value={titleEdit}
+                  onChange={(e) => setTitleEdit(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="input-field">
+              <div className="label-row">
+                <label>Short description</label>
+                <span className={`char-count-pill ${shortDesc.length > 80 ? 'error' : shortDesc.length > 70 ? 'warning' : ''}`}>
+                  {shortDesc.length} / 80
+                </span>
+              </div>
+              <div className="input-with-icon-large">
+                <AlignLeft size={20} />
+                <input
+                  type="text"
+                  placeholder="Tagline (max 80 chars)"
+                  value={shortDesc}
+                  onChange={(e) => setShortDesc(e.target.value)}
+                  maxLength={80}
+                />
+              </div>
+            </div>
+
+            <div className="input-field">
+              <div className="label-row">
+                <label>Long description</label>
+                <span className={`char-count-pill ${longDesc.length > 4000 ? 'error' : longDesc.length > 3500 ? 'warning' : ''}`}>
+                  {longDesc.length.toLocaleString()} / 4,000
+                </span>
+              </div>
+              <textarea
+                rows={6}
+                value={longDesc}
+                onChange={(e) => setLongDesc(e.target.value)}
+                placeholder="Full listing description shown on the store page."
+                className="glass-input editor-textarea premium-scroll"
+                maxLength={4000}
+                style={{ minHeight: 180, padding: 16, borderRadius: 16 }}
+              />
             </div>
 
             <div className="input-field">
