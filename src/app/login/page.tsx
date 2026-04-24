@@ -62,8 +62,12 @@ export default function LoginPage() {
           <div className="login-input-wrap">
             <Lock size={16} />
             <input
-              type="password"
-              autoComplete="new-password"
+              type="text"
+              autoComplete="off"
+              data-lpignore="true"
+              data-1p-ignore="true"
+              data-form-type="other"
+              className="masked-input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"

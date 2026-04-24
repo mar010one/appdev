@@ -17,9 +17,14 @@ function RevealInput({ name, placeholder }: { name: string; placeholder?: string
   return (
     <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
       <input
-        type={revealed ? 'text' : 'password'}
+        type="text"
         name={name}
         placeholder={placeholder}
+        autoComplete="off"
+        data-lpignore="true"
+        data-1p-ignore="true"
+        data-form-type="other"
+        className={revealed ? undefined : 'masked-input'}
         style={{ paddingRight: '40px', width: '100%' }}
       />
       <button
