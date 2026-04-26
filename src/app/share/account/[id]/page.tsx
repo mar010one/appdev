@@ -3,6 +3,8 @@ import { notFound, redirect } from 'next/navigation';
 import AccountSharePackage from '@/components/AccountSharePackage';
 import type { Metadata } from 'next';
 
+export const dynamic = 'force-dynamic';
+
 // `[id]` here is the 1-based share index (`/s2` → 2nd account), not the DB row id.
 async function resolveAccountId(idParam: string): Promise<number | null> {
   const idx = parseInt(idParam, 10);

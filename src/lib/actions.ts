@@ -784,34 +784,44 @@ export async function updateAccountStatus(id: number, status: string) {
   }
 }
 
-export async function setAccountShareActive(id: number, active: boolean): Promise<ActionResponse> {
+export async function setAccountShareActive(id: number, active: boolean): Promise<ActionResponse<{ share_active: boolean }>> {
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('accounts')
       .update({ share_active: active })
-      .eq('id', id);
+      .eq('id', id)
+      .select('id, share_active');
     if (error) throw error;
+    if (!data || data.length === 0) {
+      throw new Error(`Account #${id} not found — share toggle could not be saved.`);
+    }
+    const saved = !!data[0].share_active;
     revalidatePath('/accounts');
     revalidatePath(`/accounts/${id}`);
     revalidatePath('/share/account/[id]', 'page');
-    return { success: true };
+    return { success: true, data: { share_active: saved } };
   } catch (error) {
     console.error('Error in setAccountShareActive:', error);
     return { error: (error as Error).message };
   }
 }
 
-export async function setAppShareActive(id: number, active: boolean): Promise<ActionResponse> {
+export async function setAppShareActive(id: number, active: boolean): Promise<ActionResponse<{ share_active: boolean }>> {
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('apps')
       .update({ share_active: active })
-      .eq('id', id);
+      .eq('id', id)
+      .select('id, share_active');
     if (error) throw error;
+    if (!data || data.length === 0) {
+      throw new Error(`App #${id} not found — share toggle could not be saved.`);
+    }
+    const saved = !!data[0].share_active;
     revalidatePath('/apps');
     revalidatePath(`/apps/${id}`);
     revalidatePath('/share/[id]', 'page');
-    return { success: true };
+    return { success: true, data: { share_active: saved } };
   } catch (error) {
     console.error('Error in setAppShareActive:', error);
     return { error: (error as Error).message };

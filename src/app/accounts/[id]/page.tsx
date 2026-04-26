@@ -62,7 +62,7 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
           </div>
         </div>
         <div className="account-hero-actions">
-          <AccountShareLinkButton accountId={account.id} />
+          <AccountShareLinkButton accountId={account.id} shareActive={!!account.share_active} />
           <EditAccountModal account={account} allCompanies={allCompanies} />
           <CreateAppModal accounts={[account]} />
         </div>

@@ -20,6 +20,9 @@ const nextConfig: NextConfig = {
     // Tree-shake large icon / supabase packages so only the symbols we
     // actually import end up in the client bundle.
     optimizePackageImports: ['lucide-react', '@supabase/ssr', '@supabase/supabase-js'],
+    // Disable the dev-server HMR fetch cache so share-page share_active checks
+    // always hit Supabase fresh instead of serving a stale redirect/render.
+    serverComponentsHmrCache: false,
   },
   async rewrites() {
     // Short share URLs: /a<id> for app listings, /s<id> for store accounts.

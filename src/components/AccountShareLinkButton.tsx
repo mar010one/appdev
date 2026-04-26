@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Share2, Copy, Check, ExternalLink, X, Lock } from 'lucide-react';
 import ModalPortal from './ModalPortal';
 import { setAccountShareActive, getAccountShareIndex } from '@/lib/actions';
@@ -27,6 +28,7 @@ export default function AccountShareLinkButton({
   accountId: number;
   shareActive?: boolean;
 }) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState<string>('');
   const [copied, setCopied] = useState(false);
@@ -64,6 +66,11 @@ export default function AccountShareLinkButton({
     if (result.error) {
       setShareActive(!next);
       alert(result.error);
+    } else if (result.data) {
+      // Trust the server's view of share_active so the toggle can't lie about
+      // a save that didn't actually persist.
+      setShareActive(!!result.data.share_active);
+      router.refresh();
     }
     setToggling(false);
   }

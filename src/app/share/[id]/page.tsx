@@ -4,6 +4,8 @@ import AppInfoView from '@/components/AppInfoView';
 import VersionTimeline from '@/components/VersionTimeline';
 import type { Metadata } from 'next';
 
+export const dynamic = 'force-dynamic';
+
 // `[id]` here is the 1-based share index (`/a3` → 3rd app), not the DB row id.
 async function resolveAppId(idParam: string): Promise<number | null> {
   const idx = parseInt(idParam, 10);
