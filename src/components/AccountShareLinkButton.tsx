@@ -83,7 +83,7 @@ export default function AccountShareLinkButton({
         className="btn btn-secondary"
         style={{ padding: '9px 16px', fontSize: '0.85rem', borderRadius: '12px' }}
       >
-        <Share2 size={15} />
+        <Share2 size={15} color={shareActive ? '#22c55e' : '#ef4444'} />
         Share Link
       </button>
 

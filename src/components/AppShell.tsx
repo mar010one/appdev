@@ -14,7 +14,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  const isPublic = pathname.startsWith('/share');
+  const isPublic = pathname.startsWith('/share') || /^\/a\d+/.test(pathname) || /^\/s\d+/.test(pathname);
   const isLogin = pathname.startsWith('/login');
 
   // Fetch the user once on mount. Re-fetching on every pathname change

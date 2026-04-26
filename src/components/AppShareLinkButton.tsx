@@ -88,7 +88,7 @@ export default function AppShareLinkButton({
         style={buttonStyle ?? { width: '40px', padding: 0, justifyContent: 'center' }}
         title={shareActive ? 'Share link is active — click to manage' : 'Share link is off — click to manage'}
       >
-        <Share2 size={16} />
+        <Share2 size={16} color={shareActive ? '#22c55e' : '#ef4444'} />
         {label}
       </button>
 
