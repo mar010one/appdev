@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import AppStatusMenu, { statusIcon, statusLabel } from './AppStatusMenu';
 import ListingVersionModal from './ListingVersionModal';
+import AppShareLinkButton from './AppShareLinkButton';
 
 type App = {
   id: number;
@@ -35,6 +36,7 @@ type App = {
   account_phone?: string;
   account_type?: string;
   screenshots?: Array<{ id: number; file_path: string }>;
+  share_active?: boolean;
 };
 
 type ListingVersion = {
@@ -254,7 +256,7 @@ export default function AppInfoView({
   // Build the absolute share URL on the client so it works behind any host.
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      setShareUrl(`${window.location.origin}/share/${app.id}`);
+      setShareUrl(`${window.location.origin}/a${app.id}`);
     }
   }, [app.id]);
 
@@ -361,15 +363,12 @@ export default function AppInfoView({
             {bundleCopied ? 'All info copied' : 'Copy all info'}
           </button>
           {!isShare && (
-            <button
-              type="button"
-              className={`btn btn-secondary ${linkCopied ? 'success' : ''}`}
-              onClick={copyShareLink}
-              title="Copy a public link to share with the upload team"
-            >
-              {linkCopied ? <Check size={16} /> : <Share2 size={16} />}
-              {linkCopied ? 'Link copied' : 'Copy share link'}
-            </button>
+            <AppShareLinkButton
+              appId={app.id}
+              shareActive={!!app.share_active}
+              buttonStyle={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              label="Share link"
+            />
           )}
           {!isShare && (
             <Link href={`/apps/${app.id}`} className="btn btn-secondary">
@@ -384,19 +383,33 @@ export default function AppInfoView({
         <div className="share-banner glass-card">
           <div className="share-banner-icon"><Share2 size={20} /></div>
           <div className="share-banner-body">
-            <strong>Public share link</strong>
-            <p className="text-muted">Send this URL to your upload team — they&apos;ll see all assets and copy-ready text without needing dashboard access.</p>
-            <div className="share-banner-url-row">
+            <strong>Public share link {app.share_active ? '(active)' : '(off)'}</strong>
+            <p className="text-muted">
+              {app.share_active
+                ? "Send this URL to your upload team — they'll see all assets and copy-ready text without needing dashboard access."
+                : "The link is currently inactive — visitors will be sent to the login page. Open the Share link button above to turn it on."}
+            </p>
+            <div className="share-banner-url-row" style={{ opacity: app.share_active ? 1 : 0.55 }}>
               <code className="share-banner-url"><Link2 size={12} />{shareUrl}</code>
               <button
                 type="button"
                 className={`info-mini-btn ${linkCopied ? 'success' : ''}`}
                 onClick={copyShareLink}
+                disabled={!app.share_active}
+                title={app.share_active ? 'Copy link' : 'Activate sharing first'}
               >
                 {linkCopied ? <Check size={14} /> : <Copy size={14} />}
                 <span>{linkCopied ? 'Copied' : 'Copy'}</span>
               </button>
-              <a href={shareUrl} target="_blank" rel="noreferrer" className="info-mini-btn">
+              <a
+                href={app.share_active ? shareUrl : undefined}
+                target="_blank"
+                rel="noreferrer"
+                className="info-mini-btn"
+                aria-disabled={!app.share_active}
+                onClick={(e) => { if (!app.share_active) e.preventDefault(); }}
+                style={{ pointerEvents: app.share_active ? 'auto' : 'none' }}
+              >
                 <ExternalLink size={14} /> <span>Open</span>
               </a>
             </div>

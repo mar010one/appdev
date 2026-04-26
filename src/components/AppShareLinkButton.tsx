@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Share2, Copy, Check, ExternalLink, X, Lock } from 'lucide-react';
 import ModalPortal from './ModalPortal';
-import { setAccountShareActive, getAccountShareIndex } from '@/lib/actions';
+import { setAppShareActive, getAppShareIndex } from '@/lib/actions';
 
 async function copyText(text: string): Promise<boolean> {
   if (navigator.clipboard && window.isSecureContext) {
@@ -20,12 +20,16 @@ async function copyText(text: string): Promise<boolean> {
   return ok;
 }
 
-export default function AccountShareLinkButton({
-  accountId,
+export default function AppShareLinkButton({
+  appId,
   shareActive: initialShareActive = false,
+  buttonStyle,
+  label,
 }: {
-  accountId: number;
+  appId: number;
   shareActive?: boolean;
+  buttonStyle?: React.CSSProperties;
+  label?: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState<string>('');
@@ -41,13 +45,13 @@ export default function AccountShareLinkButton({
     if (typeof window === 'undefined') return;
     let cancelled = false;
     (async () => {
-      const idx = await getAccountShareIndex(accountId);
+      const idx = await getAppShareIndex(appId);
       if (cancelled) return;
-      const slug = idx ?? accountId;
-      setShareUrl(`${window.location.origin}/s${slug}`);
+      const slug = idx ?? appId;
+      setShareUrl(`${window.location.origin}/a${slug}`);
     })();
     return () => { cancelled = true; };
-  }, [accountId]);
+  }, [appId]);
 
   async function copyNow() {
     if (!shareUrl || !shareActive) return;
@@ -60,7 +64,7 @@ export default function AccountShareLinkButton({
     const next = !shareActive;
     setToggling(true);
     setShareActive(next);
-    const result = await setAccountShareActive(accountId, next);
+    const result = await setAppShareActive(appId, next);
     if (result.error) {
       setShareActive(!next);
       alert(result.error);
@@ -73,11 +77,12 @@ export default function AccountShareLinkButton({
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="btn btn-secondary"
-        style={{ padding: '9px 16px', fontSize: '0.85rem', borderRadius: '12px' }}
+        className={`btn btn-secondary ${label ? '' : 'small'} ${shareActive ? 'success' : ''}`}
+        style={buttonStyle ?? { width: '40px', padding: 0, justifyContent: 'center' }}
+        title={shareActive ? 'Share link is active — click to manage' : 'Share link is off — click to manage'}
       >
-        <Share2 size={15} />
-        Share Link
+        <Share2 size={16} />
+        {label}
       </button>
 
       <ModalPortal open={isOpen}>
@@ -98,10 +103,10 @@ export default function AccountShareLinkButton({
                 </div>
                 <div>
                   <h2 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0, letterSpacing: '-0.01em' }}>
-                    Share with registration team
+                    Share with upload team
                   </h2>
                   <p className="text-muted" style={{ fontSize: '0.72rem', margin: '1px 0 0' }}>
-                    Read-only link with all fields + company documents.
+                    Read-only listing package + version timeline.
                   </p>
                 </div>
               </div>
@@ -134,7 +139,7 @@ export default function AccountShareLinkButton({
                   </div>
                   <div className="text-muted" style={{ fontSize: '0.72rem', marginTop: '2px' }}>
                     {shareActive
-                      ? 'Anyone with the link can view credentials and VCC.'
+                      ? 'Anyone with the link can view the listing.'
                       : 'Link is dead — visitors are sent to the login page.'}
                   </div>
                 </div>
@@ -222,7 +227,7 @@ export default function AccountShareLinkButton({
               </div>
 
               <p style={{ fontSize: '0.76rem', color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
-                Default is off. Activate only while the registration team needs the link, then turn it back off — visitors will be redirected to the login page.
+                Default is off. Activate only while the upload team needs the link, then turn it back off — visitors will be redirected to the login page.
               </p>
             </div>
           </div>

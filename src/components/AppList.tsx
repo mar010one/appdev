@@ -1,12 +1,13 @@
 'use client';
 
-import { Smartphone, ChevronRight, Hash, Trash2, Share2, Check, History, Eye, Package, Tag, Filter, ArrowUpDown } from "lucide-react";
+import { Smartphone, ChevronRight, Hash, Trash2, History, Eye, Package, Tag, Filter, ArrowUpDown } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import EditAppModal from "./EditAppModal";
 import AppStatusMenu from "./AppStatusMenu";
 import StatusWaitPill from "./StatusWaitPill";
+import AppShareLinkButton from "./AppShareLinkButton";
 import { buildPlayStoreUrl } from "./CreateAppModal";
 import { deleteApp, getUserPref, setUserPref } from "@/lib/actions";
 import { getCurrentUser } from "@/lib/auth";
@@ -50,7 +51,6 @@ export default function AppList({
   emptyMessage?: string;
 }) {
   const router = useRouter();
-  const [copiedId, setCopiedId] = useState<number | null>(null);
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [sortMode, setSortMode] = useState<SortMode>('newest');
@@ -115,18 +115,6 @@ export default function AppList({
       const result = await deleteApp(id);
       if (result.error) alert(result.error);
       else router.refresh();
-    }
-  }
-
-  async function handleShare(id: number) {
-    if (typeof window === 'undefined') return;
-    const url = `${window.location.origin}/share/${id}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopiedId(id);
-      setTimeout(() => setCopiedId(prev => (prev === id ? null : prev)), 1800);
-    } catch {
-      window.prompt('Copy this share link:', url);
     }
   }
 
@@ -375,14 +363,7 @@ export default function AppList({
 
             {/* Actions Column */}
             <div style={{ flex: 1.4, display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-              <button
-                onClick={() => handleShare(app.id)}
-                className={`btn btn-secondary small ${copiedId === app.id ? 'success' : ''}`}
-                style={{ width: '40px', padding: 0, justifyContent: 'center' }}
-                title="Copy public share link for the upload team"
-              >
-                {copiedId === app.id ? <Check size={16} /> : <Share2 size={16} />}
-              </button>
+              <AppShareLinkButton appId={app.id} shareActive={!!app.share_active} />
               <Link
                 href={`/apps/${app.id}`}
                 className="btn btn-secondary small"

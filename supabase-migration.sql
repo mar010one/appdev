@@ -58,6 +58,12 @@ ALTER TABLE apps ADD COLUMN IF NOT EXISTS status_updated_at TIMESTAMPTZ;
 UPDATE apps SET status_updated_at = COALESCE(status_updated_at, created_at, NOW())
   WHERE status_updated_at IS NULL;
 
+-- Share gate: links default OFF so credentials/VCC stay hidden until owner activates
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS share_active BOOLEAN DEFAULT FALSE;
+ALTER TABLE apps     ADD COLUMN IF NOT EXISTS share_active BOOLEAN DEFAULT FALSE;
+UPDATE accounts SET share_active = FALSE WHERE share_active IS NULL;
+UPDATE apps     SET share_active = FALSE WHERE share_active IS NULL;
+
 CREATE TABLE IF NOT EXISTS versions (
   id BIGSERIAL PRIMARY KEY,
   app_id BIGINT NOT NULL REFERENCES apps(id) ON DELETE CASCADE,

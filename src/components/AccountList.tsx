@@ -373,7 +373,7 @@ export default function AccountList({ initialAccounts }: { initialAccounts: any[
 
             {/* Actions */}
             <div className="account-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '7px', alignItems: 'center' }}>
-              <AccountShareLinkButton accountId={acc.id} />
+              <AccountShareLinkButton accountId={acc.id} shareActive={!!acc.share_active} />
               <EditAccountModal account={acc} onUpdate={handleAccountUpdate} />
               <button
                 onClick={() => handleDelete(acc.id, acc.developer_name)}

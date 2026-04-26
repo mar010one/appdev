@@ -132,6 +132,45 @@ async function saveMultiDocs(
   }
 }
 
+// ── Share index helpers ───────────────────────────────────────────────────────
+// Share URLs use a 1-based "logical" position (1, 2, 3…) instead of the raw
+// BIGSERIAL id, so a user with 6 apps sees /a1 … /a6 instead of /a8, /a13, …
+// Position is derived by ordering by id ASC, which is stable as long as no
+// rows are inserted out-of-order — Postgres BIGSERIAL guarantees that.
+
+async function shareIndexOf(table: 'apps' | 'accounts', rowId: number): Promise<number | null> {
+  const { count, error } = await supabase
+    .from(table)
+    .select('id', { count: 'exact', head: true })
+    .lte('id', rowId);
+  if (error || count == null || count === 0) return null;
+  return count;
+}
+
+async function rowIdByShareIndex(table: 'apps' | 'accounts', idx: number): Promise<number | null> {
+  if (!Number.isFinite(idx) || idx < 1) return null;
+  const { data, error } = await supabase
+    .from(table)
+    .select('id')
+    .order('id', { ascending: true })
+    .range(idx - 1, idx - 1);
+  if (error || !data || data.length === 0) return null;
+  return data[0].id as number;
+}
+
+export async function getAppShareIndex(appId: number) {
+  return shareIndexOf('apps', appId);
+}
+export async function getAccountShareIndex(accountId: number) {
+  return shareIndexOf('accounts', accountId);
+}
+export async function getAppIdByShareIndex(idx: number) {
+  return rowIdByShareIndex('apps', idx);
+}
+export async function getAccountIdByShareIndex(idx: number) {
+  return rowIdByShareIndex('accounts', idx);
+}
+
 // ── Accounts ──────────────────────────────────────────────────────────────────
 
 export async function getAccounts() {
@@ -578,7 +617,7 @@ export async function addVersion(
 
     revalidatePath(`/apps/${appId}`);
     revalidatePath(`/apps/${appId}/info`);
-    revalidatePath(`/share/${appId}`);
+    revalidatePath('/share/[id]', 'page');
     revalidatePath('/versions');
     revalidatePath('/apps');
     return { success: true, data: { id: versionId } };
@@ -624,7 +663,7 @@ export async function updateVersion(
 
     revalidatePath(`/apps/${existing.app_id}`);
     revalidatePath(`/apps/${existing.app_id}/info`);
-    revalidatePath(`/share/${existing.app_id}`);
+    revalidatePath('/share/[id]', 'page');
     revalidatePath('/versions');
     revalidatePath('/apps');
     return { success: true };
@@ -658,7 +697,7 @@ export async function deleteVersion(versionId: number): Promise<ActionResponse> 
 
     revalidatePath(`/apps/${v.app_id}`);
     revalidatePath(`/apps/${v.app_id}/info`);
-    revalidatePath(`/share/${v.app_id}`);
+    revalidatePath('/share/[id]', 'page');
     revalidatePath('/versions');
     return { success: true };
   } catch (error) {
@@ -741,6 +780,40 @@ export async function updateAccountStatus(id: number, status: string) {
     return { success: true };
   } catch (error) {
     console.error('Error in updateAccountStatus:', error);
+    return { error: (error as Error).message };
+  }
+}
+
+export async function setAccountShareActive(id: number, active: boolean): Promise<ActionResponse> {
+  try {
+    const { error } = await supabase
+      .from('accounts')
+      .update({ share_active: active })
+      .eq('id', id);
+    if (error) throw error;
+    revalidatePath('/accounts');
+    revalidatePath(`/accounts/${id}`);
+    revalidatePath('/share/account/[id]', 'page');
+    return { success: true };
+  } catch (error) {
+    console.error('Error in setAccountShareActive:', error);
+    return { error: (error as Error).message };
+  }
+}
+
+export async function setAppShareActive(id: number, active: boolean): Promise<ActionResponse> {
+  try {
+    const { error } = await supabase
+      .from('apps')
+      .update({ share_active: active })
+      .eq('id', id);
+    if (error) throw error;
+    revalidatePath('/apps');
+    revalidatePath(`/apps/${id}`);
+    revalidatePath('/share/[id]', 'page');
+    return { success: true };
+  } catch (error) {
+    console.error('Error in setAppShareActive:', error);
     return { error: (error as Error).message };
   }
 }
@@ -929,7 +1002,7 @@ export async function updateApp(id: number, formData: FormData) {
     revalidatePath('/apps');
     revalidatePath(`/apps/${id}`);
     revalidatePath(`/apps/${id}/info`);
-    revalidatePath(`/share/${id}`);
+    revalidatePath('/share/[id]', 'page');
     revalidatePath('/');
     return { success: true };
   } catch (error) {

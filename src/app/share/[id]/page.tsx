@@ -1,15 +1,22 @@
-import { getAppById, getVersions, getListingVersions } from '@/lib/actions';
-import { notFound } from 'next/navigation';
+import { getAppById, getAppIdByShareIndex, getVersions, getListingVersions } from '@/lib/actions';
+import { notFound, redirect } from 'next/navigation';
 import AppInfoView from '@/components/AppInfoView';
 import VersionTimeline from '@/components/VersionTimeline';
 import type { Metadata } from 'next';
 
+// `[id]` here is the 1-based share index (`/a3` → 3rd app), not the DB row id.
+async function resolveAppId(idParam: string): Promise<number | null> {
+  const idx = parseInt(idParam, 10);
+  if (Number.isNaN(idx)) return null;
+  return await getAppIdByShareIndex(idx);
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
-  const appId = parseInt(id, 10);
-  if (Number.isNaN(appId)) return { title: 'App listing' };
+  const appId = await resolveAppId(id);
+  if (!appId) return { title: 'App listing' };
   const app = await getAppById(appId);
-  if (!app) return { title: 'App listing' };
+  if (!app || !app.share_active) return { title: 'App listing' };
   return {
     title: `${app.name} — Store Listing Package`,
     description: app.short_description || `Listing assets and copy for ${app.name}`,
@@ -18,8 +25,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function PublicSharePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const appId = parseInt(id, 10);
-  if (Number.isNaN(appId)) return notFound();
+  const appId = await resolveAppId(id);
+  if (!appId) return notFound();
 
   const [app, versions, listingVersions] = await Promise.all([
     getAppById(appId),
@@ -27,6 +34,7 @@ export default async function PublicSharePage({ params }: { params: Promise<{ id
     getListingVersions(appId),
   ]);
   if (!app) return notFound();
+  if (!app.share_active) redirect('/login');
 
   return (
     <>

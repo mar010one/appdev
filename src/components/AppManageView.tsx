@@ -5,12 +5,13 @@ import Link from 'next/link';
 import {
   ArrowLeft, Smartphone, Hash, Plus, Loader2, Check, FileDown, Upload,
   Image as ImageIcon, FileImage, X, Trash2, History, GitCommit, Sparkles,
-  ExternalLink, Share2, Copy, Info, Edit3, RefreshCw, Type, AlignLeft,
+  ExternalLink, Copy, Info, Edit3, RefreshCw, Type, AlignLeft,
 } from 'lucide-react';
 import EditAppModal from './EditAppModal';
 import EditVersionModal from './EditVersionModal';
 import AppStatusMenu from './AppStatusMenu';
 import StatusWaitPill from './StatusWaitPill';
+import AppShareLinkButton from './AppShareLinkButton';
 import { addVersion, deleteVersion } from '@/lib/actions';
 import { uploadFilesInForm } from '@/lib/upload-client';
 
@@ -43,6 +44,7 @@ type App = {
   account_type?: string;
   created_at?: string;
   screenshots?: Screenshot[];
+  share_active?: boolean;
 };
 
 function suggestNextVersion(versions: Version[]): string {
@@ -87,20 +89,6 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
   const [updateAppAssets, setUpdateAppAssets] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const aabInputRef = useRef<HTMLInputElement>(null);
-
-  // ---- Share link ----
-  const [linkCopied, setLinkCopied] = useState(false);
-  async function copyShareLink() {
-    if (typeof window === 'undefined') return;
-    const url = `${window.location.origin}/share/${app.id}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      setLinkCopied(true);
-      setTimeout(() => setLinkCopied(false), 1800);
-    } catch {
-      window.prompt('Copy this share link:', url);
-    }
-  }
 
   // Compute simple "what changed" hints by comparing each version to the previous (older) one.
   const changeHints = useMemo(() => {
@@ -266,15 +254,12 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
         </div>
         <div className="info-hero-actions">
           <EditAppModal app={app} />
-          <button
-            type="button"
-            className={`btn btn-secondary ${linkCopied ? 'success' : ''}`}
-            onClick={copyShareLink}
-            title="Copy public share link for the upload team"
-          >
-            {linkCopied ? <Check size={16} /> : <Share2 size={16} />}
-            {linkCopied ? 'Link copied' : 'Copy share link'}
-          </button>
+          <AppShareLinkButton
+            appId={app.id}
+            shareActive={!!app.share_active}
+            buttonStyle={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            label="Share link"
+          />
           <Link href={`/apps/${app.id}/info`} className="btn btn-secondary">
             <Info size={16} /> Listing Info
           </Link>

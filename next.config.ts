@@ -21,6 +21,14 @@ const nextConfig: NextConfig = {
     // actually import end up in the client bundle.
     optimizePackageImports: ['lucide-react', '@supabase/ssr', '@supabase/supabase-js'],
   },
+  async rewrites() {
+    // Short share URLs: /a<id> for app listings, /s<id> for store accounts.
+    // Kept memorable so links pasted into chat are easy to recognize.
+    return [
+      { source: '/a:id([0-9]+)', destination: '/share/:id' },
+      { source: '/s:id([0-9]+)', destination: '/share/account/:id' },
+    ];
+  },
 };
 
 export default nextConfig;

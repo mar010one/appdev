@@ -27,7 +27,13 @@ export async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
-  const isPublic = pathname.startsWith('/share') || pathname.startsWith('/login');
+  // `/a<digits>` and `/s<digits>` are rewritten to /share/* in next.config.ts,
+  // but middleware runs *before* rewrites — so we need to whitelist the short
+  // forms here too, otherwise authenticated-only redirect kicks in first.
+  const isPublic =
+    pathname.startsWith('/share') ||
+    pathname.startsWith('/login') ||
+    /^\/[as]\d+$/.test(pathname);
 
   if (!isPublic && !user) {
     return NextResponse.redirect(new URL('/login', request.url));
