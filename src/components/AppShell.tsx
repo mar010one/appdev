@@ -1,6 +1,6 @@
 'use client';
 
-import { BookOpen, Building2, ClipboardList, Globe, Hash, LayoutDashboard, LogOut, Menu, Settings, Smartphone, StickyNote, Users, Wallet, X } from 'lucide-react';
+import { BookOpen, Building2, ChevronsLeft, ChevronsRight, ClipboardList, Globe, Hash, LayoutDashboard, LogOut, Menu, Settings, Smartphone, StickyNote, Users, Wallet, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { ReactNode, useEffect, useState } from 'react';
@@ -12,6 +12,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [checked, setChecked] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const isPublic = pathname.startsWith('/share');
   const isLogin = pathname.startsWith('/login');
@@ -53,6 +54,23 @@ export default function AppShell({ children }: { children: ReactNode }) {
   }, [pathname]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.localStorage.getItem('sidebarCollapsed') === 'true') {
+      setSidebarCollapsed(true);
+    }
+  }, []);
+
+  function toggleSidebarCollapsed() {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('sidebarCollapsed', String(next));
+      }
+      return next;
+    });
+  }
+
+  useEffect(() => {
     if (sidebarOpen) {
       document.body.style.overflow = 'hidden';
     } else {
@@ -85,7 +103,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className={`layout-wrapper ${sidebarOpen ? 'sidebar-open' : ''}`}>
+    <div className={`layout-wrapper ${sidebarOpen ? 'sidebar-open' : ''} ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       <button
         type="button"
         className="mobile-menu-toggle"
@@ -103,6 +121,15 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <div className="logo-section">
           <div className="logo-icon">A</div>
           <span className="logo-text">AppManager<span className="gold">Pro</span></span>
+          <button
+            type="button"
+            className="sidebar-collapse-toggle"
+            onClick={toggleSidebarCollapsed}
+            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {sidebarCollapsed ? <ChevronsRight size={18} /> : <ChevronsLeft size={18} />}
+          </button>
           <button
             type="button"
             className="sidebar-close"

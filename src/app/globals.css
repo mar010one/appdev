@@ -3453,8 +3453,8 @@ select option {
 .status-pill.status-draft          { color: #94a3b8; border-color: rgba(148, 163, 184, 0.25); background: rgba(148, 163, 184, 0.08); }
 .status-pill.status-pending_review { color: #38bdf8; border-color: rgba(56, 189, 248, 0.3);  background: rgba(56, 189, 248, 0.08); }
 .status-pill.status-live           { color: #22c55e; border-color: rgba(34, 197, 94, 0.3);   background: rgba(34, 197, 94, 0.08); }
-.status-pill.status-rejected       { color: #ef4444; border-color: rgba(239, 68, 68, 0.3);   background: rgba(239, 68, 68, 0.08); }
-.status-pill.status-suspended      { color: #f59e0b; border-color: rgba(245, 158, 11, 0.3);  background: rgba(245, 158, 11, 0.08); }
+.status-pill.status-rejected       { color: #f59e0b; border-color: rgba(245, 158, 11, 0.3);  background: rgba(245, 158, 11, 0.08); }
+.status-pill.status-suspended      { color: #ef4444; border-color: rgba(239, 68, 68, 0.3);   background: rgba(239, 68, 68, 0.08); }
 .status-pill.status-removed        { color: #a78bfa; border-color: rgba(167, 139, 250, 0.3); background: rgba(167, 139, 250, 0.08); }
 .status-pill.status-closed         { color: #64748b; border-color: rgba(100, 116, 139, 0.25); background: rgba(100, 116, 139, 0.06); }
 
@@ -3521,8 +3521,8 @@ select option {
 
 .status-menu-item.status-live           .status-menu-item-icon { color: #22c55e; }
 .status-menu-item.status-pending_review .status-menu-item-icon { color: #38bdf8; }
-.status-menu-item.status-rejected       .status-menu-item-icon { color: #ef4444; }
-.status-menu-item.status-suspended      .status-menu-item-icon { color: #f59e0b; }
+.status-menu-item.status-rejected       .status-menu-item-icon { color: #f59e0b; }
+.status-menu-item.status-suspended      .status-menu-item-icon { color: #ef4444; }
 .status-menu-item.status-removed        .status-menu-item-icon { color: #a78bfa; }
 .status-menu-item.status-draft          .status-menu-item-icon { color: #94a3b8; }
 .status-menu-item.status-closed         .status-menu-item-icon { color: #64748b; }
@@ -3550,8 +3550,8 @@ select option {
 /* Subtle row hint — left border tint colored by status */
 .list-item-row.status-row-live           { box-shadow: inset 3px 0 0 0 rgba(34, 197, 94, 0.5); }
 .list-item-row.status-row-pending_review { box-shadow: inset 3px 0 0 0 rgba(56, 189, 248, 0.5); }
-.list-item-row.status-row-rejected       { box-shadow: inset 3px 0 0 0 rgba(239, 68, 68, 0.5); }
-.list-item-row.status-row-suspended      { box-shadow: inset 3px 0 0 0 rgba(245, 158, 11, 0.5); }
+.list-item-row.status-row-rejected       { box-shadow: inset 3px 0 0 0 rgba(245, 158, 11, 0.5); }
+.list-item-row.status-row-suspended      { box-shadow: inset 3px 0 0 0 rgba(239, 68, 68, 0.5); }
 .list-item-row.status-row-removed        { box-shadow: inset 3px 0 0 0 rgba(167, 139, 250, 0.5); opacity: 0.7; }
 
 /* ============================================================
@@ -6072,6 +6072,74 @@ input:focus, select:focus, textarea:focus {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+}
+
+/* --- Desktop sidebar collapse toggle --- */
+.sidebar-collapse-toggle {
+  display: inline-flex;
+  margin-left: auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--glass);
+  border: 1px solid var(--card-border);
+  color: var(--muted);
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+  flex-shrink: 0;
+}
+
+.sidebar-collapse-toggle:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+@media (max-width: 768px) {
+  .sidebar-collapse-toggle { display: none; }
+}
+
+/* --- Collapsed sidebar (desktop only) --- */
+@media (min-width: 769px) {
+  .sidebar-collapsed .sidebar {
+    width: 76px;
+    padding: 32px 10px;
+  }
+
+  .sidebar-collapsed .logo-section {
+    flex-direction: column;
+    gap: 16px;
+    padding: 0 0 28px;
+    align-items: center;
+  }
+
+  .sidebar-collapsed .logo-text {
+    display: none;
+  }
+
+  .sidebar-collapsed .sidebar-collapse-toggle {
+    margin-left: 0;
+  }
+
+  .sidebar-collapsed .nav-item {
+    justify-content: center;
+    padding: 12px;
+    gap: 0;
+  }
+
+  .sidebar-collapsed .nav-item span {
+    display: none;
+  }
+
+  .sidebar-collapsed .user-chip {
+    justify-content: center;
+    padding: 8px;
+  }
+
+  .sidebar-collapsed .user-meta {
+    display: none;
+  }
 }
 
 /* ========== <= 1024px : small desktops / landscape tablets ========== */

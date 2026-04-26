@@ -39,6 +39,49 @@ function deriveDefaultPrivacyUrl(website?: string) {
   }
 }
 
+// Mirrors Google Play's "Application" category list. Keep in sync with the
+// dropdown shown in EditAppModal.
+export const APP_CATEGORIES: string[] = [
+  'Art & Design',
+  'Auto & Vehicles',
+  'Beauty',
+  'Books & Reference',
+  'Business',
+  'Comics',
+  'Communication',
+  'Dating',
+  'Education',
+  'Entertainment',
+  'Events',
+  'Finance',
+  'Food & Drink',
+  'Health & Fitness',
+  'House & Home',
+  'Libraries & Demo',
+  'Lifestyle',
+  'Maps & Navigation',
+  'Medical',
+  'Music & Audio',
+  'News & Magazines',
+  'Parenting',
+  'Personalization',
+  'Photography',
+  'Productivity',
+  'Shopping',
+  'Social',
+  'Sports',
+  'Tools',
+  'Travel & Local',
+  'Video Players & Editors',
+  'Weather',
+];
+
+export function buildPlayStoreUrl(packageName?: string | null): string {
+  const pkg = (packageName || '').trim();
+  if (!pkg) return '';
+  return `https://play.google.com/store/apps/details?id=${pkg}`;
+}
+
 export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
@@ -61,7 +104,10 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
     accounts[0]?.id ? String(accounts[0].id) : ''
   );
   const [appName, setAppName] = useState('');
+  const [packageName, setPackageName] = useState('');
+  const [category, setCategory] = useState('');
   const [storeUrl, setStoreUrl] = useState('');
+  const [storeUrlTouched, setStoreUrlTouched] = useState(false);
   const [shortDesc, setShortDesc] = useState('');
   const [longDesc, setLongDesc] = useState('');
 
@@ -103,6 +149,13 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
     if (!websiteTouched) setWebsiteUrl(selectedAccount.website || '');
     if (!privacyTouched) setPrivacyUrl(deriveDefaultPrivacyUrl(selectedAccount.website));
   }, [selectedAccount, emailTouched, websiteTouched, privacyTouched]);
+
+  // Auto-derive the Play Store URL from the package name. Stops once the user
+  // edits the URL field manually, so explicit overrides win.
+  useEffect(() => {
+    if (storeUrlTouched) return;
+    setStoreUrl(buildPlayStoreUrl(packageName));
+  }, [packageName, storeUrlTouched]);
 
   const nextStep = () => setStep(s => Math.min(s + 1, TOTAL_STEPS));
   const prevStep = () => setStep(s => Math.max(s - 1, 1));
@@ -206,6 +259,8 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
     const formData = new FormData();
     formData.set('accountId', selectedAccountId);
     formData.set('name', appName);
+    formData.set('packageName', packageName);
+    formData.set('category', category);
     formData.set('storeUrl', storeUrl);
     formData.set('shortDescription', shortDesc);
     formData.set('longDescription', longDesc);
@@ -267,7 +322,10 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
     setKeywords([]);
     setUsedKeywords([]);
     setAppName('');
+    setPackageName('');
+    setCategory('');
     setStoreUrl('');
+    setStoreUrlTouched(false);
     setShortDesc('');
     setLongDesc('');
     setContactEmail('');
@@ -477,6 +535,51 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
                         />
                       </div>
                     </div>
+
+                    <div className="input-field">
+                      <label>Package Name</label>
+                      <div className="input-with-icon-large">
+                        <Package size={22} />
+                        <input
+                          type="text"
+                          name="packageName"
+                          placeholder="com.yourcompany.appname"
+                          value={packageName}
+                          onChange={(e) => setPackageName(e.target.value.trim())}
+                          autoComplete="off"
+                          spellCheck={false}
+                        />
+                      </div>
+                      {packageName && (
+                        <p className="dev-card-hint" style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <LinkIcon size={12} />
+                          <span>Store URL: </span>
+                          <a
+                            href={buildPlayStoreUrl(packageName)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: 'var(--accent)', wordBreak: 'break-all' }}
+                          >
+                            {buildPlayStoreUrl(packageName)}
+                          </a>
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="input-field">
+                      <label>Category</label>
+                      <select
+                        name="category"
+                        value={category}
+                        onChange={(e) => setCategory(e.target.value)}
+                      >
+                        <option value="">— Select a Google Play category —</option>
+                        {APP_CATEGORIES.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+
                     <div className="input-field">
                       <label>Official Store URL (Optional)</label>
                       <div className="input-with-icon-large">
@@ -484,11 +587,16 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
                         <input
                           type="url"
                           name="storeUrl"
-                          placeholder="https://play.google.com/store/..."
+                          placeholder="Auto-generated from package name"
                           value={storeUrl}
-                          onChange={(e) => setStoreUrl(e.target.value)}
+                          onChange={(e) => { setStoreUrl(e.target.value); setStoreUrlTouched(true); }}
                         />
                       </div>
+                      {!storeUrlTouched && packageName && (
+                        <p className="dev-card-hint" style={{ marginTop: 6 }}>
+                          Auto-filled from the package name above. Type to override.
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>

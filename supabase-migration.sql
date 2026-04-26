@@ -38,6 +38,8 @@ CREATE TABLE IF NOT EXISTS apps (
   id BIGSERIAL PRIMARY KEY,
   account_id BIGINT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
+  package_name TEXT,
+  category TEXT,
   short_description TEXT,
   long_description TEXT,
   icon_small_path TEXT,
@@ -49,6 +51,12 @@ CREATE TABLE IF NOT EXISTS apps (
   status TEXT DEFAULT 'draft',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE apps ADD COLUMN IF NOT EXISTS package_name TEXT;
+ALTER TABLE apps ADD COLUMN IF NOT EXISTS category TEXT;
+ALTER TABLE apps ADD COLUMN IF NOT EXISTS status_updated_at TIMESTAMPTZ;
+UPDATE apps SET status_updated_at = COALESCE(status_updated_at, created_at, NOW())
+  WHERE status_updated_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS versions (
   id BIGSERIAL PRIMARY KEY,
@@ -200,6 +208,14 @@ CREATE TABLE IF NOT EXISTS notes (
 CREATE INDEX IF NOT EXISTS notes_owner_email_idx ON notes(owner_email);
 CREATE INDEX IF NOT EXISTS notes_updated_at_idx ON notes(updated_at DESC);
 
+CREATE TABLE IF NOT EXISTS user_preferences (
+  user_email TEXT NOT NULL,
+  pref_key TEXT NOT NULL,
+  pref_value JSONB NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (user_email, pref_key)
+);
+
 -- ── Disable RLS (internal tool — no user-specific row filtering needed) ────────
 
 ALTER TABLE accounts DISABLE ROW LEVEL SECURITY;
@@ -218,6 +234,7 @@ ALTER TABLE missions DISABLE ROW LEVEL SECURITY;
 ALTER TABLE websites DISABLE ROW LEVEL SECURITY;
 ALTER TABLE nitch DISABLE ROW LEVEL SECURITY;
 ALTER TABLE notes DISABLE ROW LEVEL SECURITY;
+ALTER TABLE user_preferences DISABLE ROW LEVEL SECURITY;
 
 -- ── Grant anon role full access (allows publishable key to work) ───────────────
 

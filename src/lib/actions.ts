@@ -303,18 +303,20 @@ export async function addAccount(formData: FormData): Promise<ActionResponse> {
 // ── Listing snapshots ─────────────────────────────────────────────────────────
 
 async function snapshotListing(appId: number, releaseFilePath?: string) {
-  const { data: app } = await supabase
+  const { data: app, error: appErr } = await supabase
     .from('apps')
     .select('*')
     .eq('id', appId)
     .single();
+  if (appErr) throw appErr;
   if (!app) return;
 
-  const { data: shots } = await supabase
+  const { data: shots, error: shotsErr } = await supabase
     .from('app_screenshots')
     .select('file_path')
     .eq('app_id', appId)
     .order('id', { ascending: true });
+  if (shotsErr) throw shotsErr;
 
   const { count: existingCount } = await supabase
     .from('listing_versions')
@@ -323,7 +325,7 @@ async function snapshotListing(appId: number, releaseFilePath?: string) {
 
   const label = `v${(existingCount || 0) + 1}`;
 
-  await supabase.from('listing_versions').insert({
+  const { error: insertErr } = await supabase.from('listing_versions').insert({
     app_id: appId,
     version_label: label,
     name: app.name,
@@ -338,6 +340,7 @@ async function snapshotListing(appId: number, releaseFilePath?: string) {
     screenshots_json: JSON.stringify((shots || []).map((s: any) => s.file_path)),
     release_file_path: releaseFilePath || null,
   });
+  if (insertErr) throw insertErr;
 }
 
 export async function getListingVersions(appId: number) {
@@ -416,9 +419,14 @@ export async function addApp(
   try {
     const accountId = formData.get('accountId');
     const name = formData.get('name') as string;
+    const package_name = ((formData.get('packageName') as string) || '').trim();
+    const category = ((formData.get('category') as string) || '').trim();
     const short_description = formData.get('shortDescription') as string;
     const long_description = formData.get('longDescription') as string;
-    const store_url = formData.get('storeUrl') as string;
+    const explicitStoreUrl = ((formData.get('storeUrl') as string) || '').trim();
+    const store_url = explicitStoreUrl
+      ? explicitStoreUrl
+      : (package_name ? `https://play.google.com/store/apps/details?id=${package_name}` : '');
     const contact_email = (formData.get('contactEmail') as string) || '';
     const privacy_url = (formData.get('privacyUrl') as string) || '';
     const website_url = (formData.get('websiteUrl') as string) || '';
@@ -435,6 +443,8 @@ export async function addApp(
       .insert({
         account_id: accountId,
         name,
+        package_name: package_name || null,
+        category: category || null,
         short_description,
         long_description,
         icon_small_path: iconSmallPath,
@@ -443,6 +453,7 @@ export async function addApp(
         contact_email,
         privacy_url,
         website_url,
+        status_updated_at: new Date().toISOString(),
       })
       .select('id')
       .single();
@@ -573,6 +584,52 @@ export async function addVersion(
     return { success: true, data: { id: versionId } };
   } catch (error) {
     console.error('Error in addVersion:', error);
+    return { error: (error as Error).message };
+  }
+}
+
+export async function updateVersion(
+  versionId: number,
+  formData: FormData,
+): Promise<ActionResponse> {
+  try {
+    const versionNumber = ((formData.get('versionNumber') as string) || '').trim();
+    const changelog = (formData.get('changelog') as string) ?? '';
+    const releaseDate = ((formData.get('releaseDate') as string) || '').trim();
+
+    if (!versionNumber) return { error: 'Version number is required.' };
+
+    const updates: Record<string, any> = {
+      version_number: versionNumber,
+      changelog,
+    };
+    if (releaseDate) {
+      const dt = new Date(releaseDate);
+      if (!Number.isNaN(dt.getTime())) updates.release_date = dt.toISOString();
+    }
+
+    const { data: existing, error: lookupErr } = await supabase
+      .from('versions')
+      .select('app_id')
+      .eq('id', versionId)
+      .single();
+    if (lookupErr) throw lookupErr;
+    if (!existing) return { error: 'Version not found.' };
+
+    const { error } = await supabase
+      .from('versions')
+      .update(updates)
+      .eq('id', versionId);
+    if (error) throw error;
+
+    revalidatePath(`/apps/${existing.app_id}`);
+    revalidatePath(`/apps/${existing.app_id}/info`);
+    revalidatePath(`/share/${existing.app_id}`);
+    revalidatePath('/versions');
+    revalidatePath('/apps');
+    return { success: true };
+  } catch (error) {
+    console.error('Error in updateVersion:', error);
     return { error: (error as Error).message };
   }
 }
@@ -820,15 +877,23 @@ export async function deleteApp(id: number) {
 export async function updateApp(id: number, formData: FormData) {
   try {
     const name = formData.get('name') as string;
+    const package_name = ((formData.get('packageName') as string) || '').trim();
+    const category = ((formData.get('category') as string) || '').trim();
     const short_description = formData.get('shortDescription') as string;
     const long_description = formData.get('longDescription') as string;
-    const store_url = formData.get('storeUrl') as string;
+    const explicitStoreUrl = ((formData.get('storeUrl') as string) || '').trim();
+    const store_url = explicitStoreUrl
+      ? explicitStoreUrl
+      : (package_name ? `https://play.google.com/store/apps/details?id=${package_name}` : '');
     const contact_email = (formData.get('contactEmail') as string) || '';
     const privacy_url = (formData.get('privacyUrl') as string) || '';
     const website_url = (formData.get('websiteUrl') as string) || '';
 
     const updates: Record<string, any> = {
-      name, short_description, long_description,
+      name,
+      package_name: package_name || null,
+      category: category || null,
+      short_description, long_description,
       store_url, contact_email, privacy_url, website_url,
     };
 
@@ -838,14 +903,24 @@ export async function updateApp(id: number, formData: FormData) {
     const iconLargePath = await saveUploadedFile(formData.get('iconLarge'), 'icons', 'large-');
     if (iconLargePath) updates.icon_large_path = iconLargePath;
 
-    await supabase.from('apps').update(updates).eq('id', id);
+    const { data: updated, error: updateErr } = await supabase
+      .from('apps')
+      .update(updates)
+      .eq('id', id)
+      .select('id')
+      .single();
+    if (updateErr) throw updateErr;
+    if (!updated) throw new Error(`No app with id=${id} was updated`);
 
     for (let i = 0; i < 8; i++) {
       const screenshotPath = await saveUploadedFile(
         formData.get(`screenshot_${i}`), 'screenshots', `shot-${i}-`,
       );
       if (screenshotPath) {
-        await supabase.from('app_screenshots').insert({ app_id: id, file_path: screenshotPath });
+        const { error: shotErr } = await supabase
+          .from('app_screenshots')
+          .insert({ app_id: id, file_path: screenshotPath });
+        if (shotErr) throw shotErr;
       }
     }
 
@@ -881,7 +956,11 @@ export async function updateAppStatus(id: number, status: string): Promise<Actio
     if (!VALID_APP_STATUSES.includes(status as AppStatus)) {
       return { error: `Invalid status. Allowed: ${VALID_APP_STATUSES.join(', ')}` };
     }
-    await supabase.from('apps').update({ status }).eq('id', id);
+    const { error } = await supabase
+      .from('apps')
+      .update({ status, status_updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) throw error;
     revalidatePath('/apps');
     revalidatePath(`/apps/${id}`);
     revalidatePath(`/apps/${id}/info`);
@@ -1982,6 +2061,45 @@ export async function updateMission(id: number, formData: FormData): Promise<Act
     revalidatePath('/missions');
     return { success: true };
   } catch (error: any) {
+    return { error: error.message };
+  }
+}
+
+// ── User preferences ──────────────────────────────────────────────────────────
+// Per-user UI state (filter/sort selections etc.) keyed by email.
+
+export async function getUserPref<T = any>(
+  userEmail: string,
+  prefKey: string,
+): Promise<T | null> {
+  if (!userEmail) return null;
+  const { data, error } = await supabase
+    .from('user_preferences')
+    .select('pref_value')
+    .eq('user_email', userEmail)
+    .eq('pref_key', prefKey)
+    .maybeSingle();
+  if (error || !data) return null;
+  return data.pref_value as T;
+}
+
+export async function setUserPref(
+  userEmail: string,
+  prefKey: string,
+  prefValue: any,
+): Promise<ActionResponse> {
+  try {
+    if (!userEmail) return { error: 'Not signed in.' };
+    const { error } = await supabase
+      .from('user_preferences')
+      .upsert(
+        { user_email: userEmail, pref_key: prefKey, pref_value: prefValue, updated_at: new Date().toISOString() },
+        { onConflict: 'user_email,pref_key' },
+      );
+    if (error) throw error;
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error in setUserPref:', error);
     return { error: error.message };
   }
 }

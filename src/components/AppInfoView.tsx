@@ -7,7 +7,7 @@ import {
   Mail, Globe, ShieldCheck, ExternalLink, Hash,
   Sparkles, FileImage, ImageIcon as Image, ImagesIcon,
   PartyPopper, Share2, Link2, History, RefreshCw, FileDown,
-  Package,
+  Package, Tag,
 } from 'lucide-react';
 import AppStatusMenu, { statusIcon, statusLabel } from './AppStatusMenu';
 import ListingVersionModal from './ListingVersionModal';
@@ -15,6 +15,8 @@ import ListingVersionModal from './ListingVersionModal';
 type App = {
   id: number;
   name: string;
+  package_name?: string;
+  category?: string;
   short_description?: string;
   long_description?: string;
   icon_small_path?: string;
@@ -267,6 +269,8 @@ export default function AppInfoView({
 
   const lines: string[] = [
     `App Name: ${app.name || ''}`,
+    `Package Name: ${app.package_name || ''}`,
+    `Category: ${app.category || ''}`,
     `Short Description: ${app.short_description || ''}`,
     '',
     'Long Description:',
@@ -334,6 +338,12 @@ export default function AppInfoView({
               </span>
               {app.account_developer_id && (
                 <span className="info-pill"><Hash size={12} />{app.account_developer_id}</span>
+              )}
+              {app.package_name && (
+                <span className="info-pill" title="Package name"><Package size={12} />{app.package_name}</span>
+              )}
+              {app.category && (
+                <span className="info-pill" title="Category"><Tag size={12} />{app.category}</span>
               )}
               {app.created_at && (
                 <span className="info-pill">Created {new Date(app.created_at).toLocaleDateString()}</span>
@@ -490,6 +500,13 @@ export default function AppInfoView({
           </div>
 
           <CopyableField label="App Name" value={app.name} icon={<Smartphone size={14} />} />
+          <CopyableField
+            label="Package Name"
+            value={app.package_name}
+            icon={<Package size={14} />}
+            href={app.package_name ? `https://play.google.com/store/apps/details?id=${app.package_name}` : undefined}
+          />
+          <CopyableField label="Category" value={app.category} icon={<Tag size={14} />} />
           <CopyableField label="Short Description" value={app.short_description} icon={<Sparkles size={14} />} />
           <CopyableField label="Long Description" value={app.long_description} multiline icon={<Sparkles size={14} />} />
 

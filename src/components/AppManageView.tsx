@@ -8,7 +8,9 @@ import {
   ExternalLink, Share2, Copy, Info, Edit3, RefreshCw, Type, AlignLeft,
 } from 'lucide-react';
 import EditAppModal from './EditAppModal';
+import EditVersionModal from './EditVersionModal';
 import AppStatusMenu from './AppStatusMenu';
+import StatusWaitPill from './StatusWaitPill';
 import { addVersion, deleteVersion } from '@/lib/actions';
 import { uploadFilesInForm } from '@/lib/upload-client';
 
@@ -34,6 +36,7 @@ type App = {
   icon_large_path?: string;
   store_url?: string;
   status?: string;
+  status_updated_at?: string;
   account_email?: string;
   account_developer_name?: string;
   account_developer_id?: string;
@@ -246,6 +249,11 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
             <p className="text-muted info-sub">{app.short_description || 'No tagline'}</p>
             <div className="info-hero-meta">
               <AppStatusMenu appId={app.id} status={app.status || 'draft'} />
+              <StatusWaitPill
+                status={app.status}
+                statusUpdatedAt={app.status_updated_at}
+                createdAt={app.created_at}
+              />
               <span className={`account-badge ${app.account_type || ''}`}>
                 {app.account_developer_name || app.account_email}
               </span>
@@ -556,15 +564,27 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
                       <div className="version-meta-modern">
                         <span>{fmtDate(v.release_date)}</span>
                       </div>
-                      <button
-                        type="button"
-                        className="btn btn-secondary small"
-                        style={{ width: 32, padding: 0, justifyContent: 'center', color: '#ef4444' }}
-                        onClick={() => handleDeleteVersion(v.id, v.version_number)}
-                        title="Delete version"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      <div style={{ display: 'inline-flex', gap: 6, marginLeft: 'auto' }}>
+                        <EditVersionModal
+                          version={{
+                            id: v.id,
+                            version_number: v.version_number,
+                            changelog: v.changelog,
+                            release_date: v.release_date,
+                          }}
+                          isLatest={isLatest}
+                          triggerLabel={isLatest ? 'Edit current' : undefined}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-secondary small"
+                          style={{ width: 32, padding: 0, justifyContent: 'center', color: '#ef4444' }}
+                          onClick={() => handleDeleteVersion(v.id, v.version_number)}
+                          title="Delete version"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
 
                     <div className="version-hints">

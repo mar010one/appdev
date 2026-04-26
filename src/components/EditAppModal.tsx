@@ -1,22 +1,33 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { X, Smartphone, Globe, Save, AlignLeft, Sparkles, Loader2, ChevronLeft, Image as ImageIcon, FileImage, Plus, Check, Trash2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { X, Smartphone, Globe, Save, AlignLeft, Sparkles, Loader2, ChevronLeft, Image as ImageIcon, FileImage, Plus, Check, Trash2, Package, Link as LinkIcon } from 'lucide-react';
 import { updateApp, generateAppDescriptions, deleteScreenshot } from '@/lib/actions';
 import { uploadFilesInForm } from '@/lib/upload-client';
 import ModalPortal from './ModalPortal';
+import { APP_CATEGORIES, buildPlayStoreUrl } from './CreateAppModal';
 
 export default function EditAppModal({ app }: { app: any }) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState<'content' | 'assets'>('content');
   const [aiPrompt, setAiPrompt] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
-  
-  // States for controlled inputs
+
+  // States for controlled inputs.
+  // These have to be controlled (not defaultValue) because the Content Studio
+  // tab unmounts when the user switches to Visual Assets — uncontrolled inputs
+  // would drop their values from FormData on save.
+  const [appName, setAppName] = useState(app.name || '');
   const [shortDesc, setShortDesc] = useState(app.short_description || '');
   const [longDesc, setLongDesc] = useState(app.long_description || '');
+  const [packageName, setPackageName] = useState(app.package_name || '');
+  const [category, setCategory] = useState(app.category || '');
+  const [storeUrl, setStoreUrl] = useState(app.store_url || '');
+  const [storeUrlTouched, setStoreUrlTouched] = useState(false);
 
   // Visual Assets State
   const [iconPreview, setIconPreview] = useState<string | null>(app.icon_small_path || null);
@@ -25,25 +36,45 @@ export default function EditAppModal({ app }: { app: any }) {
   const [newScreenshotPreviews, setNewScreenshotPreviews] = useState<string[]>([]);
   const [newScreenshotFiles, setNewScreenshotFiles] = useState<File[]>([]);
 
-  // Sync state when app prop changes (crucial for refresh after save)
+  // Sync state when app prop changes (crucial for refresh after save).
+  // Only re-sync while the modal is closed — otherwise opening the modal,
+  // typing, and triggering an unrelated parent refresh would wipe edits.
   useEffect(() => {
+    if (isOpen) return;
+    setAppName(app.name || '');
     setShortDesc(app.short_description || '');
     setLongDesc(app.long_description || '');
+    setPackageName(app.package_name || '');
+    setCategory(app.category || '');
+    setStoreUrl(app.store_url || '');
+    setStoreUrlTouched(false);
     setIconPreview(app.icon_small_path || null);
     setPromoPreview(app.icon_large_path || null);
     setExistingScreenshots(app.screenshots || []);
     setNewScreenshotFiles([]);
     setNewScreenshotPreviews([]);
-  }, [app]);
+  }, [app, isOpen]);
+
+  // Auto-derive store URL from package name unless the user has edited it.
+  useEffect(() => {
+    if (storeUrlTouched) return;
+    const derived = buildPlayStoreUrl(packageName);
+    if (derived) setStoreUrl(derived);
+  }, [packageName, storeUrlTouched]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setIsPending(true);
     const formData = new FormData(e.currentTarget);
     
-    // Ensure controlled states are sent
+    // Ensure controlled states are sent — these are required because the
+    // Content Studio tab unmounts on the assets tab, dropping form inputs.
+    formData.set('name', appName);
     formData.set('shortDescription', shortDesc);
     formData.set('longDescription', longDesc);
+    formData.set('packageName', packageName);
+    formData.set('category', category);
+    formData.set('storeUrl', storeUrl);
 
     // Append new screenshots
     newScreenshotFiles.forEach((file, index) => {
@@ -71,11 +102,15 @@ export default function EditAppModal({ app }: { app: any }) {
 
     const result = await updateApp(app.id, formData);
     setIsPending(false);
-    
+
     if (result.success) {
       setIsOpen(false);
       setNewScreenshotFiles([]);
       setNewScreenshotPreviews([]);
+      // Re-fetch server data so the page shows the saved values.
+      // revalidatePath alone only invalidates the cache — the client
+      // router still serves the prior render until refresh() is called.
+      router.refresh();
     } else {
       alert(result.error || 'Something went wrong');
     }
@@ -210,14 +245,68 @@ export default function EditAppModal({ app }: { app: any }) {
                         <label>App Name</label>
                         <div className="input-with-icon-large">
                           <Smartphone size={20} />
-                          <input type="text" name="name" defaultValue={app.name} required />
+                          <input
+                            type="text"
+                            name="name"
+                            value={appName}
+                            onChange={(e) => setAppName(e.target.value)}
+                            required
+                          />
                         </div>
+                      </div>
+                      <div className="input-field">
+                        <label>Package Name</label>
+                        <div className="input-with-icon-large">
+                          <Package size={20} />
+                          <input
+                            type="text"
+                            name="packageName"
+                            placeholder="com.yourcompany.appname"
+                            value={packageName}
+                            onChange={(e) => setPackageName(e.target.value.trim())}
+                            autoComplete="off"
+                            spellCheck={false}
+                          />
+                        </div>
+                        {packageName && (
+                          <p className="dev-card-hint" style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <LinkIcon size={12} />
+                            <span>Store URL: </span>
+                            <a
+                              href={buildPlayStoreUrl(packageName)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: 'var(--accent)', wordBreak: 'break-all' }}
+                            >
+                              {buildPlayStoreUrl(packageName)}
+                            </a>
+                          </p>
+                        )}
+                      </div>
+                      <div className="input-field">
+                        <label>Category</label>
+                        <select
+                          name="category"
+                          value={category}
+                          onChange={(e) => setCategory(e.target.value)}
+                        >
+                          <option value="">— Select a Google Play category —</option>
+                          {APP_CATEGORIES.map((c) => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
                       </div>
                       <div className="input-field">
                         <label>Store URL</label>
                         <div className="input-with-icon-large">
                           <Globe size={20} />
-                          <input type="url" name="storeUrl" defaultValue={app.store_url} />
+                          <input
+                            type="url"
+                            name="storeUrl"
+                            placeholder="Auto-generated from package name"
+                            value={storeUrl}
+                            onChange={(e) => { setStoreUrl(e.target.value); setStoreUrlTouched(true); }}
+                          />
                         </div>
                       </div>
                     </div>

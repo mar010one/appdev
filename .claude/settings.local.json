@@ -8,7 +8,15 @@
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
       "Bash(git commit *)",
-      "Bash(git check-ignore *)"
+      "Bash(git check-ignore *)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(where npx *)",
+      "Bash(npm --version)",
+      "Bash(curl -s -X POST https://api.supabase.com/v1/projects/agivntinmsxzebhwczri/database/query -H 'Authorization: Bearer sbp_5eedb97ddccbd2b0ac6d9c4b24471d5afebd9f0b' -H 'Content-Type: application/json' -d '{\"query\":\"ALTER TABLE apps ADD COLUMN IF NOT EXISTS package_name TEXT; ALTER TABLE apps ADD COLUMN IF NOT EXISTS category TEXT; NOTIFY pgrst, '\\\\''reload schema'\\\\'';\"}')",
+      "Bash(curl -s -X POST https://api.supabase.com/v1/projects/agivntinmsxzebhwczri/database/query -H 'Authorization: Bearer sbp_5eedb97ddccbd2b0ac6d9c4b24471d5afebd9f0b' -H 'Content-Type: application/json' -d '{\"query\":\"SELECT column_name, data_type FROM information_schema.columns WHERE table_schema='\\\\''public'\\\\'' AND table_name='\\\\''apps'\\\\'' ORDER BY ordinal_position;\"}')",
+      "Bash(curl -s -X POST https://api.supabase.com/v1/projects/agivntinmsxzebhwczri/database/query -H 'Authorization: Bearer sbp_5eedb97ddccbd2b0ac6d9c4b24471d5afebd9f0b' -H 'Content-Type: application/json' -d '{\"query\":\"SELECT column_name, data_type FROM information_schema.columns WHERE table_schema='\\\\''public'\\\\'' AND table_name='\\\\''user_preferences'\\\\'' ORDER BY ordinal_position;\"}')",
+      "Bash(npx next *)",
+      "Bash(curl -s -X POST https://api.supabase.com/v1/projects/agivntinmsxzebhwczri/database/query -H 'Authorization: Bearer sbp_5eedb97ddccbd2b0ac6d9c4b24471d5afebd9f0b' -H 'Content-Type: application/json' -d '{\"query\":\"SELECT id, name, created_at FROM apps ORDER BY created_at DESC;\"}')"
     ]
   }
 }
