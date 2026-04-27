@@ -235,7 +235,14 @@ export default function AccountList({ initialAccounts }: { initialAccounts: any[
           </div>
         )}
 
-        {filtered.map(acc => (
+        {filtered.map(acc => {
+          const accentShadow = acc.status === 'active'
+            ? 'inset 3px 0 0 0 #22c55e'
+            : 'inset 3px 0 0 0 rgba(255,255,255,0.1)';
+          const hoverShadow = acc.status === 'active'
+            ? 'inset 3px 0 0 0 #22c55e, 0 8px 32px -10px rgba(0,0,0,0.5)'
+            : 'inset 3px 0 0 0 rgba(255,255,255,0.1), 0 8px 32px -10px rgba(0,0,0,0.5)';
+          return (
           <div
             key={acc.id}
             className="account-list-row"
@@ -252,48 +259,42 @@ export default function AccountList({ initialAccounts }: { initialAccounts: any[
               borderColor: acc.status === 'closed' ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.085)',
               borderRadius: '18px',
               opacity: acc.status === 'closed' ? 0.62 : 1,
-              transition: 'all 0.2s ease',
-              position: 'relative',
-              overflow: 'hidden',
+              boxShadow: accentShadow,
+              transition: 'background 0.2s, border-color 0.2s, transform 0.2s, box-shadow 0.2s',
             }}
             onMouseEnter={e => {
               if (acc.status !== 'closed') {
                 (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.14)';
                 (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.058)';
                 (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)';
-                (e.currentTarget as HTMLDivElement).style.boxShadow = '0 8px 32px -10px rgba(0,0,0,0.5)';
+                (e.currentTarget as HTMLDivElement).style.boxShadow = hoverShadow;
               }
             }}
             onMouseLeave={e => {
               (e.currentTarget as HTMLDivElement).style.borderColor = acc.status === 'closed' ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.085)';
               (e.currentTarget as HTMLDivElement).style.background = acc.status === 'closed' ? 'rgba(255,255,255,0.018)' : 'rgba(255,255,255,0.04)';
               (e.currentTarget as HTMLDivElement).style.transform = 'none';
-              (e.currentTarget as HTMLDivElement).style.boxShadow = 'none';
+              (e.currentTarget as HTMLDivElement).style.boxShadow = accentShadow;
             }}
           >
-            {/* Left accent bar */}
-            <div style={{
-              position: 'absolute', left: 0, top: '14px', bottom: '14px', width: '3px',
-              borderRadius: '0 3px 3px 0',
-              background: acc.status === 'active'
-                ? 'linear-gradient(to bottom, #22c55e, rgba(34,197,94,0.25))'
-                : 'rgba(255,255,255,0.08)',
-            }} />
 
             {/* Developer */}
             <Link href={`/accounts/${acc.id}`} className="account-main" style={{
-              display: 'flex', alignItems: 'center', gap: '11px',
+              display: 'flex', alignItems: 'center', gap: '12px',
               color: 'inherit', textDecoration: 'none', minWidth: 0,
             }}>
-              <div style={{
-                width: '43px', height: '43px', borderRadius: '13px', flexShrink: 0,
+              <div className="account-avatar" style={{
+                width: '44px', height: '44px', borderRadius: '13px', flexShrink: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontWeight: 900, fontSize: '1.05rem',
+                fontWeight: 900, fontSize: '1.1rem',
                 background: acc.type === 'google_play'
-                  ? 'linear-gradient(135deg, rgba(66,133,244,0.22), rgba(66,133,244,0.08))'
-                  : 'linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.04))',
-                color: acc.type === 'google_play' ? '#4285f4' : '#e2e8f0',
-                border: `1px solid ${acc.type === 'google_play' ? 'rgba(66,133,244,0.3)' : 'rgba(255,255,255,0.11)'}`,
+                  ? 'linear-gradient(135deg, rgba(66,133,244,0.35) 0%, rgba(66,133,244,0.12) 100%)'
+                  : 'linear-gradient(135deg, rgba(234,179,8,0.22) 0%, rgba(234,179,8,0.08) 100%)',
+                color: acc.type === 'google_play' ? '#60a5fa' : 'var(--accent)',
+                border: `1px solid ${acc.type === 'google_play' ? 'rgba(66,133,244,0.42)' : 'rgba(234,179,8,0.32)'}`,
+                boxShadow: acc.type === 'google_play'
+                  ? '0 0 0 4px rgba(66,133,244,0.06)'
+                  : '0 0 0 4px rgba(234,179,8,0.05)',
               }}>
                 {acc.developer_name?.charAt(0)?.toUpperCase() || (acc.type === 'google_play' ? 'G' : 'A')}
               </div>
@@ -465,7 +466,8 @@ export default function AccountList({ initialAccounts }: { initialAccounts: any[
               </Link>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <style>{`

@@ -6409,11 +6409,11 @@ input:focus, select:focus, textarea:focus {
     order: 2;
   }
 
-  /* Actions row: equal buttons, full width, clear CTA */
+  /* Actions row: Share | Edit | Trash | Apps — last item is the primary CTA */
   .account-list-row .account-actions {
     order: 3;
     display: grid !important;
-    grid-template-columns: 44px 44px 1fr;
+    grid-template-columns: 1fr 42px 42px minmax(96px, 1.1fr);
     gap: 8px !important;
     padding-top: 12px;
     border-top: 1px solid rgba(255, 255, 255, 0.06);
