@@ -6363,21 +6363,15 @@ input:focus, select:focus, textarea:focus {
   }
 
   /* Toolbar: search full-width on top, filters below */
-  .accounts-toolbar {
-    flex-direction: column;
-    align-items: stretch !important;
-    gap: 10px !important;
-  }
   .accounts-search { width: 100%; }
   .accounts-filters {
-    display: grid !important;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px !important;
+    display: flex !important;
+    gap: 4px !important;
   }
   .accounts-filters button {
-    width: 100%;
-    padding: 10px 8px !important;
-    font-size: 0.78rem !important;
+    flex: 1;
+    padding: 9px 6px !important;
+    font-size: 0.73rem !important;
   }
 
   /* Account cards: tighter, cleaner stacking */
