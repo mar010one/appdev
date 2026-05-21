@@ -9,11 +9,13 @@ import {
 } from 'lucide-react';
 import EditAppModal from './EditAppModal';
 import EditVersionModal from './EditVersionModal';
+import ListingVersionModal from './ListingVersionModal';
 import AppStatusMenu from './AppStatusMenu';
 import StatusWaitPill from './StatusWaitPill';
 import AppShareLinkButton from './AppShareLinkButton';
 import { addVersion, deleteVersion } from '@/lib/actions';
 import { uploadFilesInForm } from '@/lib/upload-client';
+import { resizeImageToFile } from '@/lib/resize-image';
 
 type Screenshot = { id: number; file_path: string };
 type Version = {
@@ -36,6 +38,9 @@ type App = {
   icon_small_path?: string;
   icon_large_path?: string;
   store_url?: string;
+  contact_email?: string;
+  privacy_url?: string;
+  website_url?: string;
   status?: string;
   status_updated_at?: string;
   account_email?: string;
@@ -82,13 +87,42 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
   const [aabInputMode, setAabInputMode] = useState<'file' | 'link'>('file');
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [iconPreview, setIconPreview] = useState<string | null>(null);
+  const [iconResizing, setIconResizing] = useState(false);
+  const [iconError, setIconError] = useState<string | null>(null);
   const [promoFile, setPromoFile] = useState<File | null>(null);
   const [promoPreview, setPromoPreview] = useState<string | null>(null);
+  const [promoResizing, setPromoResizing] = useState(false);
+  const [promoError, setPromoError] = useState<string | null>(null);
   const [shotFiles, setShotFiles] = useState<File[]>([]);
   const [shotPreviews, setShotPreviews] = useState<string[]>([]);
   const [updateAppAssets, setUpdateAppAssets] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const aabInputRef = useRef<HTMLInputElement>(null);
+  const [openVersionId, setOpenVersionId] = useState<number | null>(null);
+
+  const openVersion = openVersionId
+    ? versions.find(v => v.id === openVersionId) || null
+    : null;
+  const openVersionIsLatest = !!openVersion && versions[0]?.id === openVersion.id;
+  const openVersionSnapshot = openVersion
+    ? {
+        id: openVersion.id,
+        app_id: openVersion.app_id,
+        version_label: `v${openVersion.version_number}`,
+        name: app.name,
+        short_description: app.short_description,
+        long_description: app.long_description,
+        icon_small_path: openVersion.icon_path || app.icon_small_path,
+        icon_large_path: openVersion.promo_path || app.icon_large_path,
+        store_url: app.store_url,
+        contact_email: app.contact_email,
+        privacy_url: app.privacy_url,
+        website_url: app.website_url,
+        release_file_path: openVersion.file_path || null,
+        screenshots: (openVersion.screenshots || []).map(s => s.file_path),
+        created_at: openVersion.release_date,
+      }
+    : null;
 
   // Compute simple "what changed" hints by comparing each version to the previous (older) one.
   const changeHints = useMemo(() => {
@@ -115,17 +149,39 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
     return map;
   }, [versions]);
 
-  function handleIconChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleIconChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
-    setIconFile(f);
-    setIconPreview(URL.createObjectURL(f));
+    setIconResizing(true);
+    setIconError(null);
+    try {
+      const resized = await resizeImageToFile(f, 512, 512);
+      if (iconPreview) URL.revokeObjectURL(iconPreview);
+      setIconFile(resized);
+      setIconPreview(URL.createObjectURL(resized));
+    } catch (err: any) {
+      setIconError(err?.message || 'Could not process the image.');
+    } finally {
+      setIconResizing(false);
+      e.target.value = '';
+    }
   }
-  function handlePromoChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handlePromoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
-    setPromoFile(f);
-    setPromoPreview(URL.createObjectURL(f));
+    setPromoResizing(true);
+    setPromoError(null);
+    try {
+      const resized = await resizeImageToFile(f, 1024, 500);
+      if (promoPreview) URL.revokeObjectURL(promoPreview);
+      setPromoFile(resized);
+      setPromoPreview(URL.createObjectURL(resized));
+    } catch (err: any) {
+      setPromoError(err?.message || 'Could not process the image.');
+    } finally {
+      setPromoResizing(false);
+      e.target.value = '';
+    }
   }
   function handleShotsChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
@@ -154,8 +210,12 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
     setAabInputMode('file');
     setIconFile(null);
     setIconPreview(null);
+    setIconResizing(false);
+    setIconError(null);
     setPromoFile(null);
     setPromoPreview(null);
+    setPromoResizing(false);
+    setPromoError(null);
     setShotFiles([]);
     setShotPreviews([]);
     if (aabInputRef.current) aabInputRef.current.value = '';
@@ -164,6 +224,7 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
   async function handleSubmitVersion(e: React.FormEvent) {
     e.preventDefault();
     if (!versionNumber.trim()) return alert('Version number is required.');
+    if (iconResizing || promoResizing) return alert('An image is still being resized. Please wait a moment and try again.');
 
     setSubmitting(true);
     const fd = new FormData();
@@ -444,32 +505,62 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
             {/* Per-version assets */}
             <div className="version-assets-row">
               <div className={`mini-asset ${iconPreview ? 'has-preview' : ''}`}>
-                <div className="mini-asset-label">App Icon</div>
-                <label className="mini-asset-drop">
+                <div className="mini-asset-label">App Icon · 512 × 512</div>
+                <label className="mini-asset-drop" style={{ position: 'relative', cursor: iconResizing ? 'wait' : 'pointer' }}>
                   {iconPreview
                     ? <img src={iconPreview} alt="" />
                     : <div className="mini-asset-empty"><FileImage size={24} /><small>Upload</small></div>}
-                  <input type="file" accept="image/*" onChange={handleIconChange} />
+                  {iconResizing && (
+                    <div className="asset-resizing-overlay">
+                      <Loader2 size={22} className="animate-spin" color="var(--accent)" />
+                      <span>Resizing 512 × 512…</span>
+                    </div>
+                  )}
+                  <input type="file" accept="image/*" disabled={iconResizing} onChange={handleIconChange} />
                 </label>
-                {iconPreview && (
+                {iconPreview && !iconResizing && (
                   <button type="button" className="mini-asset-clear" onClick={() => { setIconFile(null); setIconPreview(null); }}>
                     <X size={12} />
                   </button>
                 )}
+                {iconFile && !iconError && !iconResizing && (
+                  <div className="asset-preview-footer" style={{ marginTop: 8 }}>
+                    <span className="asset-resized-badge"><Check size={12} /> 512 × 512 · {(iconFile.size / 1024).toFixed(0)} KB</span>
+                    <a href={iconPreview || '#'} download={iconFile.name} className="asset-download-btn" title="Download to verify">
+                      <Upload size={12} style={{ transform: 'rotate(180deg)' }} /> Download
+                    </a>
+                  </div>
+                )}
+                {iconError && <div className="asset-error-msg" style={{ marginTop: 8 }}><X size={14} /><span>{iconError}</span></div>}
               </div>
               <div className={`mini-asset wide ${promoPreview ? 'has-preview' : ''}`}>
-                <div className="mini-asset-label">Promo Graphic</div>
-                <label className="mini-asset-drop">
+                <div className="mini-asset-label">Promo Graphic · 1024 × 500</div>
+                <label className="mini-asset-drop" style={{ position: 'relative', cursor: promoResizing ? 'wait' : 'pointer' }}>
                   {promoPreview
                     ? <img src={promoPreview} alt="" />
                     : <div className="mini-asset-empty"><ImageIcon size={24} /><small>Upload</small></div>}
-                  <input type="file" accept="image/*" onChange={handlePromoChange} />
+                  {promoResizing && (
+                    <div className="asset-resizing-overlay">
+                      <Loader2 size={22} className="animate-spin" color="var(--accent)" />
+                      <span>Resizing 1024 × 500…</span>
+                    </div>
+                  )}
+                  <input type="file" accept="image/*" disabled={promoResizing} onChange={handlePromoChange} />
                 </label>
-                {promoPreview && (
+                {promoPreview && !promoResizing && (
                   <button type="button" className="mini-asset-clear" onClick={() => { setPromoFile(null); setPromoPreview(null); }}>
                     <X size={12} />
                   </button>
                 )}
+                {promoFile && !promoError && !promoResizing && (
+                  <div className="asset-preview-footer" style={{ marginTop: 8 }}>
+                    <span className="asset-resized-badge"><Check size={12} /> 1024 × 500 · {(promoFile.size / 1024).toFixed(0)} KB</span>
+                    <a href={promoPreview || '#'} download={promoFile.name} className="asset-download-btn" title="Download to verify">
+                      <Upload size={12} style={{ transform: 'rotate(180deg)' }} /> Download
+                    </a>
+                  </div>
+                )}
+                {promoError && <div className="asset-error-msg" style={{ marginTop: 8 }}><X size={14} /><span>{promoError}</span></div>}
               </div>
             </div>
 
@@ -540,7 +631,21 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
                 const isLatest = idx === 0;
                 const hints = changeHints.get(v.id) || [];
                 return (
-                  <article key={v.id} className={`version-card ${isLatest ? 'is-latest' : ''}`}>
+                  <article
+                    key={v.id}
+                    className={`version-card ${isLatest ? 'is-latest' : ''}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setOpenVersionId(v.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setOpenVersionId(v.id);
+                      }
+                    }}
+                    style={{ cursor: 'pointer' }}
+                    title="View full version details"
+                  >
                     <div className="version-card-head">
                       <div className="version-tag-modern">
                         <span>v{v.version_number}</span>
@@ -549,7 +654,10 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
                       <div className="version-meta-modern">
                         <span>{fmtDate(v.release_date)}</span>
                       </div>
-                      <div style={{ display: 'inline-flex', gap: 6, marginLeft: 'auto' }}>
+                      <div
+                        style={{ display: 'inline-flex', gap: 6, marginLeft: 'auto' }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <EditVersionModal
                           version={{
                             id: v.id,
@@ -564,7 +672,7 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
                           type="button"
                           className="btn btn-secondary small"
                           style={{ width: 32, padding: 0, justifyContent: 'center', color: '#ef4444' }}
-                          onClick={() => handleDeleteVersion(v.id, v.version_number)}
+                          onClick={(e) => { e.stopPropagation(); handleDeleteVersion(v.id, v.version_number); }}
                           title="Delete version"
                         >
                           <Trash2 size={14} />
@@ -584,13 +692,13 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
 
                     <div className="version-assets-preview">
                       {v.icon_path && (
-                        <a href={v.icon_path} download={fileNameFromPath(v.icon_path)} className="version-asset-thumb" title="Download icon used in this version">
+                        <a href={v.icon_path} download={fileNameFromPath(v.icon_path)} className="version-asset-thumb" title="Download icon used in this version" onClick={(e) => e.stopPropagation()}>
                           <img src={v.icon_path} alt="icon" />
                           <span>Icon</span>
                         </a>
                       )}
                       {v.promo_path && (
-                        <a href={v.promo_path} download={fileNameFromPath(v.promo_path)} className="version-asset-thumb wide" title="Download promo for this version">
+                        <a href={v.promo_path} download={fileNameFromPath(v.promo_path)} className="version-asset-thumb wide" title="Download promo for this version" onClick={(e) => e.stopPropagation()}>
                           <img src={v.promo_path} alt="promo" />
                           <span>Promo</span>
                         </a>
@@ -598,7 +706,7 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
                       {v.screenshots && v.screenshots.length > 0 && (
                         <div className="version-shots-strip">
                           {v.screenshots.map(s => (
-                            <a key={s.id} href={s.file_path} download={fileNameFromPath(s.file_path)} className="version-shot-thumb" title="Download screenshot">
+                            <a key={s.id} href={s.file_path} download={fileNameFromPath(s.file_path)} className="version-shot-thumb" title="Download screenshot" onClick={(e) => e.stopPropagation()}>
                               <img src={s.file_path} alt="screenshot" />
                             </a>
                           ))}
@@ -608,7 +716,7 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
 
                     <div className="version-card-actions">
                       {v.file_path ? (
-                        <a href={v.file_path} download={fileNameFromPath(v.file_path)} className="btn btn-primary small">
+                        <a href={v.file_path} download={fileNameFromPath(v.file_path)} className="btn btn-primary small" onClick={(e) => e.stopPropagation()}>
                           <FileDown size={14} /> Download AAB / IPA
                         </a>
                       ) : (
@@ -622,6 +730,16 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
           )}
         </section>
       </div>
+
+      {openVersionSnapshot && (
+        <ListingVersionModal
+          version={openVersionSnapshot}
+          isLatest={openVersionIsLatest}
+          open={true}
+          onClose={() => setOpenVersionId(null)}
+          hideTrigger
+        />
+      )}
     </div>
   );
 }

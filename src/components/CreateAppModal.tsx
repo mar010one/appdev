@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { addApp, generateAppDescriptions, generateDescriptionField } from '@/lib/actions';
 import { uploadFilesInForm } from '@/lib/upload-client';
+import { resizeImageToFile } from '@/lib/resize-image';
 import ModalPortal from './ModalPortal';
 
 type Account = {
@@ -132,6 +133,9 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
   const [iconError, setIconError] = useState<string | null>(null);
   const [promoError, setPromoError] = useState<string | null>(null);
   const [aabError, setAabError] = useState<string | null>(null);
+  const [warningPopup, setWarningPopup] = useState<{ title: string; message: string } | null>(null);
+  const [iconResizing, setIconResizing] = useState(false);
+  const [promoResizing, setPromoResizing] = useState(false);
 
   // Must match STORAGE_MAX_BYTES in actions.ts
   const MAX_FILE_MB = 100;
@@ -157,7 +161,31 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
     setStoreUrl(buildPlayStoreUrl(packageName));
   }, [packageName, storeUrlTouched]);
 
-  const nextStep = () => setStep(s => Math.min(s + 1, TOTAL_STEPS));
+  const buildDescriptionWarning = (): { title: string; message: string } | null => {
+    const issues: string[] = [];
+    if (shortDesc.length > 80) {
+      issues.push(`• Small Description is ${shortDesc.length} characters — ${shortDesc.length - 80} over the 80-character max.`);
+    }
+    if (longDesc.length > 4000) {
+      issues.push(`• Full Description is ${longDesc.length.toLocaleString()} characters — ${(longDesc.length - 4000).toLocaleString()} over the 4000-character max.`);
+    }
+    if (!issues.length) return null;
+    return {
+      title: 'Description over limit',
+      message: `${issues.join('\n')}\n\nGoogle Play will reject the listing at these lengths. Trim the text before continuing.`,
+    };
+  };
+
+  const nextStep = () => {
+    if (step === 2) {
+      const warn = buildDescriptionWarning();
+      if (warn) {
+        setWarningPopup(warn);
+        return;
+      }
+    }
+    setStep(s => Math.min(s + 1, TOTAL_STEPS));
+  };
   const prevStep = () => setStep(s => Math.max(s - 1, 1));
 
   async function handleAiGenerate() {
@@ -187,24 +215,31 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
   const addKeywordFromInput = () => {
     const parts = keywordInput.split(',').map(k => k.trim()).filter(Boolean);
     if (!parts.length) return;
+    let droppedForLimit = 0;
     setKeywords(prev => {
       const merged = [...prev];
       for (const p of parts) {
-        if (!merged.some(x => x.toLowerCase() === p.toLowerCase()) && merged.length < 20) {
-          merged.push(p);
+        if (merged.some(x => x.toLowerCase() === p.toLowerCase())) continue;
+        if (merged.length >= 20) {
+          droppedForLimit += 1;
+          continue;
         }
+        merged.push(p);
       }
       return merged;
     });
     setKeywordInput('');
+    if (droppedForLimit > 0) {
+      setWarningPopup({
+        title: 'Keyword limit reached',
+        message: `You've hit the 20-keyword maximum. ${droppedForLimit} keyword${droppedForLimit === 1 ? ' was' : 's were'} not added. Remove an existing keyword to make room.`,
+      });
+    }
   };
 
   const removeKeyword = (kw: string) => {
     setKeywords(prev => prev.filter(k => k !== kw));
   };
-
-  const countWords = (text: string) =>
-    text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
 
   const countKeywordInDesc = (kw: string): number => {
     if (!kw) return 0;
@@ -250,6 +285,12 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
     // are not in the DOM when we submit from step 4.
     if (!selectedAccountId) return alert('Please select a developer account.');
     if (!appName) return alert('Application name is required.');
+
+    const warn = buildDescriptionWarning();
+    if (warn) {
+      setWarningPopup(warn);
+      return;
+    }
 
     setIsPending(true);
 
@@ -346,53 +387,46 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
     setIconError(null);
     setPromoError(null);
     setAabError(null);
+    setIconResizing(false);
+    setPromoResizing(false);
   };
-
-  function checkImageDimensions(file: File, w: number, h: number): Promise<string | null> {
-    return new Promise((resolve) => {
-      const url = URL.createObjectURL(file);
-      const img = new Image();
-      img.onload = () => {
-        URL.revokeObjectURL(url);
-        if (img.naturalWidth !== w || img.naturalHeight !== h) {
-          resolve(`Must be exactly ${w}×${h}px — uploaded image is ${img.naturalWidth}×${img.naturalHeight}px.`);
-        } else {
-          resolve(null);
-        }
-      };
-      img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
-      img.src = url;
-    });
-  }
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'icon' | 'promo' | 'screenshots') => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     if (type === 'icon') {
-      const err = await checkImageDimensions(files[0], 512, 512);
-      if (err) {
-        setIconError(err);
+      setIconResizing(true);
+      setIconError(null);
+      try {
+        const resized = await resizeImageToFile(files[0], 512, 512);
+        if (iconPreview) URL.revokeObjectURL(iconPreview);
+        setIconFile(resized);
+        setIconPreview(URL.createObjectURL(resized));
+      } catch (err: any) {
+        setIconError(err?.message || 'Could not process the image.');
         setIconFile(null);
         setIconPreview(null);
+      } finally {
+        setIconResizing(false);
         e.target.value = '';
-        return;
       }
-      setIconError(null);
-      setIconFile(files[0]);
-      setIconPreview(URL.createObjectURL(files[0]));
     } else if (type === 'promo') {
-      const err = await checkImageDimensions(files[0], 1024, 500);
-      if (err) {
-        setPromoError(err);
+      setPromoResizing(true);
+      setPromoError(null);
+      try {
+        const resized = await resizeImageToFile(files[0], 1024, 500);
+        if (promoPreview) URL.revokeObjectURL(promoPreview);
+        setPromoFile(resized);
+        setPromoPreview(URL.createObjectURL(resized));
+      } catch (err: any) {
+        setPromoError(err?.message || 'Could not process the image.');
         setPromoFile(null);
         setPromoPreview(null);
+      } finally {
+        setPromoResizing(false);
         e.target.value = '';
-        return;
       }
-      setPromoError(null);
-      setPromoFile(files[0]);
-      setPromoPreview(URL.createObjectURL(files[0]));
     } else if (type === 'screenshots') {
       const newFiles = Array.from(files);
       const newPreviews = newFiles.map(file => URL.createObjectURL(file));
@@ -770,7 +804,6 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
                             type="text"
                             className="field-input"
                             placeholder="Catchy tagline — or click AI Generate below"
-                            maxLength={80}
                             value={shortDesc}
                             onChange={(e) => setShortDesc(e.target.value)}
                           />
@@ -833,10 +866,10 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
                           <div className="field-card-title">
                             <span className="field-card-dot" />
                             <label>Full Description</label>
-                            <span className="field-card-sub">Long · max 900 words</span>
+                            <span className="field-card-sub">Long · max 4000 chars</span>
                           </div>
-                          <span className={`char-count-pill ${countWords(longDesc) > 900 ? 'error' : countWords(longDesc) > 800 ? 'warning' : ''}`}>
-                            {countWords(longDesc).toLocaleString()} / 900 words
+                          <span className={`char-count-pill ${longDesc.length > 4000 ? 'error' : longDesc.length > 3500 ? 'warning' : ''}`}>
+                            {longDesc.length.toLocaleString()} / 4000
                           </span>
                         </div>
 
@@ -898,6 +931,7 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
                         </div>
                       </div>
                     </div>
+
                   </div>
                 </div>
               )}
@@ -924,11 +958,11 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
                               <span>PNG / JPG</span>
                             </div>
                           </div>
-                          {iconPreview && !iconError && (
+                          {iconPreview && !iconError && !iconResizing && (
                             <span className="asset-status-ok"><Check size={12} /> OK</span>
                           )}
                         </div>
-                        <label className="file-upload-xl" style={{ cursor: 'pointer' }}>
+                        <label className="file-upload-xl" style={{ cursor: iconResizing ? 'wait' : 'pointer' }}>
                           {iconPreview ? (
                             <>
                               <img src={iconPreview} alt="Icon Preview" className="asset-preview-img" />
@@ -938,11 +972,31 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
                             <>
                               <div className="asset-upload-icon"><FileImage size={36} /></div>
                               <p className="asset-upload-label">Click to upload</p>
-                              <p className="asset-upload-hint">Exact 512×512px required</p>
+                              <p className="asset-upload-hint">Auto-resized to 512×512px</p>
                             </>
                           )}
-                          <input type="file" name="iconSmall" accept="image/*" className="hidden-input" onChange={(e) => handleFileChange(e, 'icon')} />
+                          {iconResizing && (
+                            <div className="asset-resizing-overlay">
+                              <Loader2 size={28} className="animate-spin" color="var(--accent)" />
+                              <span>Resizing to 512 × 512…</span>
+                              <span className="resizing-sub">Processing image</span>
+                            </div>
+                          )}
+                          <input type="file" name="iconSmall" accept="image/*" className="hidden-input" disabled={iconResizing} onChange={(e) => handleFileChange(e, 'icon')} />
                         </label>
+                        {iconPreview && iconFile && !iconError && (
+                          <div className="asset-preview-footer">
+                            <span className="asset-resized-badge"><Check size={12} /> Resized · 512 × 512 · {(iconFile.size / 1024).toFixed(0)} KB</span>
+                            <a
+                              href={iconPreview}
+                              download={iconFile.name}
+                              className="asset-download-btn"
+                              title="Download the resized image to verify"
+                            >
+                              <Upload size={12} style={{ transform: 'rotate(180deg)' }} /> Download to check
+                            </a>
+                          </div>
+                        )}
                         {iconError && (
                           <div className="asset-error-msg">
                             <AlertCircle size={14} />
@@ -961,11 +1015,11 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
                               <span>PNG / JPG</span>
                             </div>
                           </div>
-                          {promoPreview && !promoError && (
+                          {promoPreview && !promoError && !promoResizing && (
                             <span className="asset-status-ok"><Check size={12} /> OK</span>
                           )}
                         </div>
-                        <label className="file-upload-xl" style={{ cursor: 'pointer' }}>
+                        <label className="file-upload-xl" style={{ cursor: promoResizing ? 'wait' : 'pointer' }}>
                           {promoPreview ? (
                             <>
                               <img src={promoPreview} alt="Promo Preview" className="asset-preview-img" />
@@ -975,11 +1029,31 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
                             <>
                               <div className="asset-upload-icon"><ImageIcon size={36} /></div>
                               <p className="asset-upload-label">Click to upload</p>
-                              <p className="asset-upload-hint">Exact 1024×500px required</p>
+                              <p className="asset-upload-hint">Auto-resized to 1024×500px</p>
                             </>
                           )}
-                          <input type="file" name="iconLarge" accept="image/*" className="hidden-input" onChange={(e) => handleFileChange(e, 'promo')} />
+                          {promoResizing && (
+                            <div className="asset-resizing-overlay">
+                              <Loader2 size={28} className="animate-spin" color="var(--accent)" />
+                              <span>Resizing to 1024 × 500…</span>
+                              <span className="resizing-sub">Processing image</span>
+                            </div>
+                          )}
+                          <input type="file" name="iconLarge" accept="image/*" className="hidden-input" disabled={promoResizing} onChange={(e) => handleFileChange(e, 'promo')} />
                         </label>
+                        {promoPreview && promoFile && !promoError && (
+                          <div className="asset-preview-footer">
+                            <span className="asset-resized-badge"><Check size={12} /> Resized · 1024 × 500 · {(promoFile.size / 1024).toFixed(0)} KB</span>
+                            <a
+                              href={promoPreview}
+                              download={promoFile.name}
+                              className="asset-download-btn"
+                              title="Download the resized image to verify"
+                            >
+                              <Upload size={12} style={{ transform: 'rotate(180deg)' }} /> Download to check
+                            </a>
+                          </div>
+                        )}
                         {promoError && (
                           <div className="asset-error-msg">
                             <AlertCircle size={14} />
@@ -1311,7 +1385,11 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
 
               <div style={{ display: 'flex', gap: '15px' }}>
                 {step < TOTAL_STEPS ? (
-                  <button type="button" className="btn-next-v2" onClick={nextStep}>
+                  <button
+                    type="button"
+                    className="btn-next-v2"
+                    onClick={nextStep}
+                  >
                     <span className="btn-next-v2-text">
                       <span className="btn-next-v2-sublabel">Next up</span>
                       <span className="btn-next-v2-label">{nextStepLabels[step]}</span>
@@ -1323,12 +1401,51 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
                     type="button"
                     className="btn btn-accent btn-glow"
                     onClick={handleFinalSubmit}
-                    disabled={isPending || shortDesc.length > 80 || countWords(longDesc) > 900 || !!aabError}
+                    disabled={isPending || !!aabError}
                   >
                     {isPending ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
                     {isPending ? 'Deploying...' : 'Save & Generate Info Page'}
                   </button>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </ModalPortal>
+
+      <ModalPortal open={!!warningPopup}>
+        <div className="modal-overlay" onClick={() => setWarningPopup(null)} style={{ zIndex: 10000 }}>
+          <div
+            className="modal-content"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 480 }}
+          >
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <AlertCircle size={22} color="#f59e0b" />
+                <h2 style={{ margin: 0, fontSize: '1.15rem' }}>{warningPopup?.title}</h2>
+              </div>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => setWarningPopup(null)}
+                aria-label="Close warning"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ margin: 0, whiteSpace: 'pre-line', lineHeight: 1.55 }}>
+                {warningPopup?.message}
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 24 }}>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => setWarningPopup(null)}
+                >
+                  Got it
+                </button>
               </div>
             </div>
           </div>

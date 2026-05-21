@@ -615,13 +615,13 @@ export default function AppInfoView({
                 <strong>App Bundle (AAB)</strong>
                 <span>{fileNameFromPath(latestAab.release_file_path ?? undefined)} · {latestAab.version_label}</span>
               </div>
-              <a
-                href={latestAab.release_file_path ?? undefined}
-                download={fileNameFromPath(latestAab.release_file_path ?? undefined)}
+              <button
+                type="button"
+                onClick={() => latestAab.release_file_path && downloadFile(latestAab.release_file_path, fileNameFromPath(latestAab.release_file_path))}
                 className="aab-download-btn"
               >
                 <FileDown size={16} /> Download AAB
-              </a>
+              </button>
             </div>
           )}
         </section>

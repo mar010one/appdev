@@ -601,11 +601,9 @@ export async function addVersion(
         await supabase.from('apps').update(updates).eq('id', appId);
       }
       if (versionScreenshots.length) {
-        const { data: oldShots } = await supabase
-          .from('app_screenshots')
-          .select('file_path')
-          .eq('app_id', appId);
-        for (const s of oldShots || []) await deleteFile(s.file_path);
+        // Keep old screenshot files in storage — earlier listing_versions
+        // snapshots still reference them via screenshots_json, and deleting
+        // would 404 when viewing those past versions.
         await supabase.from('app_screenshots').delete().eq('app_id', appId);
         for (const p of versionScreenshots) {
           await supabase.from('app_screenshots').insert({ app_id: appId, file_path: p });

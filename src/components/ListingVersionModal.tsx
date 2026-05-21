@@ -7,6 +7,7 @@ import {
   Sparkles, Globe, Mail, ShieldCheck, Hash, FileDown,
   AlignLeft, History, Clock,
 } from 'lucide-react';
+import { downloadFile } from '@/lib/download-file';
 
 type ListingVersion = {
   id: number;
@@ -82,9 +83,9 @@ function ImageCard({ label, src, hint, wide }: { label: string; src?: string | n
         <strong>{label}</strong>
         {hint && <span className="text-muted">{hint}</span>}
         <div className="info-field-actions" style={{ marginTop: 6 }}>
-          <a href={src} download={fileName(src)} className="info-mini-btn">
+          <button type="button" onClick={() => downloadFile(src, fileName(src))} className="info-mini-btn">
             <Download size={14} /> <span>Download</span>
-          </a>
+          </button>
           <a href={src} target="_blank" rel="noreferrer" className="info-mini-btn">
             <ExternalLink size={14} /> <span>Open</span>
           </a>
@@ -97,11 +98,26 @@ function ImageCard({ label, src, hint, wide }: { label: string; src?: string | n
 export default function ListingVersionModal({
   version,
   isLatest,
+  open: openProp,
+  onClose,
+  hideTrigger,
 }: {
   version: ListingVersion;
   isLatest: boolean;
+  open?: boolean;
+  onClose?: () => void;
+  hideTrigger?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [openInternal, setOpenInternal] = useState(false);
+  const isControlled = openProp !== undefined;
+  const open = isControlled ? openProp : openInternal;
+  const setOpen = (next: boolean) => {
+    if (isControlled) {
+      if (!next) onClose?.();
+    } else {
+      setOpenInternal(next);
+    }
+  };
   const [allCopied, setAllCopied] = useState(false);
 
   const lines = [
@@ -127,15 +143,17 @@ export default function ListingVersionModal({
 
   return (
     <>
-      <button
-        type="button"
-        className="info-mini-btn listing-vm-open-btn"
-        onClick={() => setOpen(true)}
-        title="View full details for this version"
-      >
-        <History size={14} />
-        <span>View full page</span>
-      </button>
+      {!hideTrigger && (
+        <button
+          type="button"
+          className="info-mini-btn listing-vm-open-btn"
+          onClick={() => setOpen(true)}
+          title="View full details for this version"
+        >
+          <History size={14} />
+          <span>View full page</span>
+        </button>
+      )}
 
       <ModalPortal open={open}>
         <div className="modal-overlay fullscreen" onClick={() => setOpen(false)}>
@@ -208,14 +226,14 @@ export default function ListingVersionModal({
                       <div className="info-section-head" style={{ marginTop: 24 }}>
                         <h2><Hash size={16} /> Binary Release</h2>
                       </div>
-                      <a
-                        href={version.release_file_path}
-                        download={fileName(version.release_file_path)}
+                      <button
+                        type="button"
+                        onClick={() => downloadFile(version.release_file_path!, fileName(version.release_file_path))}
                         className="btn btn-primary"
                         style={{ width: '100%', justifyContent: 'center' }}
                       >
                         <FileDown size={16} /> Download AAB / IPA — {fileName(version.release_file_path)}
-                      </a>
+                      </button>
                     </div>
                   )}
                 </section>
@@ -244,9 +262,9 @@ export default function ListingVersionModal({
                           <div key={`${version.id}-${i}`} className="screenshot-info-card">
                             <img src={src} alt={`Screenshot ${i + 1}`} />
                             <div className="screenshot-info-actions">
-                              <a href={src} download={fileName(src)} className="info-mini-btn">
+                              <button type="button" onClick={() => downloadFile(src, fileName(src))} className="info-mini-btn">
                                 <Download size={14} />
-                              </a>
+                              </button>
                               <a href={src} target="_blank" rel="noreferrer" className="info-mini-btn">
                                 <ExternalLink size={14} />
                               </a>

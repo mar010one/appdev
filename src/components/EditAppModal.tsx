@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { X, Smartphone, Globe, Save, AlignLeft, Sparkles, Loader2, ChevronLeft, Image as ImageIcon, FileImage, Plus, Check, Trash2, Package, Link as LinkIcon } from 'lucide-react';
+import { X, Smartphone, Globe, Save, AlignLeft, Sparkles, Loader2, ChevronLeft, Image as ImageIcon, FileImage, Plus, Check, Trash2, Package, Link as LinkIcon, Upload, AlertCircle } from 'lucide-react';
 import { updateApp, generateAppDescriptions, deleteScreenshot } from '@/lib/actions';
 import { uploadFilesInForm } from '@/lib/upload-client';
+import { resizeImageToFile } from '@/lib/resize-image';
 import ModalPortal from './ModalPortal';
 import { APP_CATEGORIES, buildPlayStoreUrl } from './CreateAppModal';
 
@@ -32,6 +33,12 @@ export default function EditAppModal({ app }: { app: any }) {
   // Visual Assets State
   const [iconPreview, setIconPreview] = useState<string | null>(app.icon_small_path || null);
   const [promoPreview, setPromoPreview] = useState<string | null>(app.icon_large_path || null);
+  const [iconFile, setIconFile] = useState<File | null>(null);
+  const [promoFile, setPromoFile] = useState<File | null>(null);
+  const [iconResizing, setIconResizing] = useState(false);
+  const [promoResizing, setPromoResizing] = useState(false);
+  const [iconError, setIconError] = useState<string | null>(null);
+  const [promoError, setPromoError] = useState<string | null>(null);
   const [existingScreenshots, setExistingScreenshots] = useState<{ id: number; file_path: string }[]>(app.screenshots || []);
   const [newScreenshotPreviews, setNewScreenshotPreviews] = useState<string[]>([]);
   const [newScreenshotFiles, setNewScreenshotFiles] = useState<File[]>([]);
@@ -50,6 +57,12 @@ export default function EditAppModal({ app }: { app: any }) {
     setStoreUrlTouched(false);
     setIconPreview(app.icon_small_path || null);
     setPromoPreview(app.icon_large_path || null);
+    setIconFile(null);
+    setPromoFile(null);
+    setIconResizing(false);
+    setPromoResizing(false);
+    setIconError(null);
+    setPromoError(null);
     setExistingScreenshots(app.screenshots || []);
     setNewScreenshotFiles([]);
     setNewScreenshotPreviews([]);
@@ -64,9 +77,13 @@ export default function EditAppModal({ app }: { app: any }) {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (iconResizing || promoResizing) {
+      alert('An image is still being resized. Please wait a moment and try again.');
+      return;
+    }
     setIsPending(true);
     const formData = new FormData(e.currentTarget);
-    
+
     // Ensure controlled states are sent — these are required because the
     // Content Studio tab unmounts on the assets tab, dropping form inputs.
     formData.set('name', appName);
@@ -75,6 +92,16 @@ export default function EditAppModal({ app }: { app: any }) {
     formData.set('packageName', packageName);
     formData.set('category', category);
     formData.set('storeUrl', storeUrl);
+
+    // Override the native <input name="iconSmall|iconLarge"> values with the
+    // resized File objects. The native inputs still hold the user's original
+    // upload — without this overwrite, Supabase would receive the un-resized
+    // image. Delete the slot when no new file was picked so the server keeps
+    // the existing asset instead of clearing it.
+    if (iconFile) formData.set('iconSmall', iconFile);
+    else formData.delete('iconSmall');
+    if (promoFile) formData.set('iconLarge', promoFile);
+    else formData.delete('iconLarge');
 
     // Append new screenshots
     newScreenshotFiles.forEach((file, index) => {
@@ -116,18 +143,42 @@ export default function EditAppModal({ app }: { app: any }) {
     }
   }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'icon' | 'promo' | 'screenshots') => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'icon' | 'promo' | 'screenshots') => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     if (type === 'icon') {
-      setIconPreview(URL.createObjectURL(files[0]));
+      setIconResizing(true);
+      setIconError(null);
+      try {
+        const resized = await resizeImageToFile(files[0], 512, 512);
+        if (iconPreview && iconPreview.startsWith('blob:')) URL.revokeObjectURL(iconPreview);
+        setIconFile(resized);
+        setIconPreview(URL.createObjectURL(resized));
+      } catch (err: any) {
+        setIconError(err?.message || 'Could not process the image.');
+      } finally {
+        setIconResizing(false);
+        e.target.value = '';
+      }
     } else if (type === 'promo') {
-      setPromoPreview(URL.createObjectURL(files[0]));
+      setPromoResizing(true);
+      setPromoError(null);
+      try {
+        const resized = await resizeImageToFile(files[0], 1024, 500);
+        if (promoPreview && promoPreview.startsWith('blob:')) URL.revokeObjectURL(promoPreview);
+        setPromoFile(resized);
+        setPromoPreview(URL.createObjectURL(resized));
+      } catch (err: any) {
+        setPromoError(err?.message || 'Could not process the image.');
+      } finally {
+        setPromoResizing(false);
+        e.target.value = '';
+      }
     } else if (type === 'screenshots') {
       const newFiles = Array.from(files);
       const newPreviews = newFiles.map(file => URL.createObjectURL(file));
-      
+
       setNewScreenshotFiles(prev => [...prev, ...newFiles]);
       setNewScreenshotPreviews(prev => [...prev, ...newPreviews]);
     }
@@ -371,7 +422,7 @@ export default function EditAppModal({ app }: { app: any }) {
                   <div className="assets-grid-edit">
                     <div className="asset-main-cols">
                       <div className="asset-upload-card icon-upload">
-                        <label>App Icon (512x512)</label>
+                        <label>App Icon (auto-resized to 512×512)</label>
                         <div className="preview-box">
                           {iconPreview ? (
                             <img src={iconPreview} alt="Icon Preview" />
@@ -381,12 +432,32 @@ export default function EditAppModal({ app }: { app: any }) {
                               <span>Small Icon</span>
                             </div>
                           )}
-                          <input type="file" name="iconSmall" accept="image/*" onChange={(e) => handleFileChange(e, 'icon')} />
+                          {iconResizing && (
+                            <div className="asset-resizing-overlay">
+                              <Loader2 size={26} className="animate-spin" color="var(--accent)" />
+                              <span>Resizing to 512 × 512…</span>
+                            </div>
+                          )}
+                          <input type="file" name="iconSmall" accept="image/*" disabled={iconResizing} onChange={(e) => handleFileChange(e, 'icon')} />
                         </div>
+                        {iconFile && !iconError && !iconResizing && (
+                          <div className="asset-preview-footer">
+                            <span className="asset-resized-badge"><Check size={12} /> Resized · 512 × 512 · {(iconFile.size / 1024).toFixed(0)} KB</span>
+                            <a href={iconPreview || '#'} download={iconFile.name} className="asset-download-btn" title="Download to verify">
+                              <Upload size={12} style={{ transform: 'rotate(180deg)' }} /> Download to check
+                            </a>
+                          </div>
+                        )}
+                        {iconError && (
+                          <div className="asset-error-msg" style={{ marginTop: 10 }}>
+                            <AlertCircle size={14} />
+                            <span>{iconError}</span>
+                          </div>
+                        )}
                       </div>
 
                       <div className="asset-upload-card promo-upload">
-                        <label>Promo Graphic (1024x500)</label>
+                        <label>Promo Graphic (auto-resized to 1024×500)</label>
                         <div className="preview-box promo">
                           {promoPreview ? (
                             <img src={promoPreview} alt="Promo Preview" />
@@ -396,8 +467,28 @@ export default function EditAppModal({ app }: { app: any }) {
                               <span>Promo Graphic</span>
                             </div>
                           )}
-                          <input type="file" name="iconLarge" accept="image/*" onChange={(e) => handleFileChange(e, 'promo')} />
+                          {promoResizing && (
+                            <div className="asset-resizing-overlay">
+                              <Loader2 size={26} className="animate-spin" color="var(--accent)" />
+                              <span>Resizing to 1024 × 500…</span>
+                            </div>
+                          )}
+                          <input type="file" name="iconLarge" accept="image/*" disabled={promoResizing} onChange={(e) => handleFileChange(e, 'promo')} />
                         </div>
+                        {promoFile && !promoError && !promoResizing && (
+                          <div className="asset-preview-footer">
+                            <span className="asset-resized-badge"><Check size={12} /> Resized · 1024 × 500 · {(promoFile.size / 1024).toFixed(0)} KB</span>
+                            <a href={promoPreview || '#'} download={promoFile.name} className="asset-download-btn" title="Download to verify">
+                              <Upload size={12} style={{ transform: 'rotate(180deg)' }} /> Download to check
+                            </a>
+                          </div>
+                        )}
+                        {promoError && (
+                          <div className="asset-error-msg" style={{ marginTop: 10 }}>
+                            <AlertCircle size={14} />
+                            <span>{promoError}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
