@@ -1544,6 +1544,179 @@ export async function getExpenseSummary(): Promise<ExpenseSummary> {
   };
 }
 
+// ── Income (network payouts) ──────────────────────────────────────────────────
+
+export type IncomeNetwork =
+  | 'admob'
+  | 'applovin'
+  | 'audience_network'
+  | 'pangle'
+  | 'unity';
+
+const INCOME_NETWORKS: IncomeNetwork[] = [
+  'admob',
+  'applovin',
+  'audience_network',
+  'pangle',
+  'unity',
+];
+
+/** Percentage going to Marwan (0–100). Abdsamad gets the rest. Default 50. */
+export async function getIncomeSplitPct(): Promise<number> {
+  const { data } = await supabase
+    .from('settings')
+    .select('value')
+    .eq('key', 'income_split_pct_marwan')
+    .maybeSingle();
+  const raw = data?.value ? parseFloat(data.value) : 50;
+  if (!Number.isFinite(raw)) return 50;
+  return Math.max(0, Math.min(100, raw));
+}
+
+export async function setIncomeSplitPct(pct: number): Promise<ActionResponse> {
+  try {
+    if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
+      return { error: 'Percentage must be between 0 and 100.' };
+    }
+    await supabase
+      .from('settings')
+      .upsert({ key: 'income_split_pct_marwan', value: String(pct) });
+    revalidatePath('/income');
+    return { success: true };
+  } catch (error) {
+    return { error: (error as Error).message };
+  }
+}
+
+export async function getIncomes() {
+  const { data } = await supabase
+    .from('income')
+    .select('*')
+    .order('income_date', { ascending: false })
+    .order('id', { ascending: false });
+  return data || [];
+}
+
+export async function addIncome(
+  formData: FormData,
+): Promise<ActionResponse<{ id: number }>> {
+  try {
+    const network = ((formData.get('network') as string) || '').toLowerCase() as IncomeNetwork;
+    const description = (formData.get('description') as string) || '';
+    const currency = ((formData.get('currency') as string) || 'USD').toUpperCase() as Currency;
+    const amountRaw = parseFloat((formData.get('amount') as string) || '0');
+    const incomeDate =
+      (formData.get('incomeDate') as string) || new Date().toISOString().slice(0, 10);
+
+    if (!INCOME_NETWORKS.includes(network)) {
+      return { error: `Network must be one of: ${INCOME_NETWORKS.join(', ')}` };
+    }
+    if (!Number.isFinite(amountRaw) || amountRaw <= 0) {
+      return { error: 'Amount must be a positive number.' };
+    }
+    if (currency !== 'MAD' && currency !== 'USD') {
+      return { error: 'Currency must be MAD or USD.' };
+    }
+
+    const rate = await getExchangeRate();
+    const amount_mad = currency === 'MAD' ? amountRaw : amountRaw * rate;
+    const amount_usd = currency === 'USD' ? amountRaw : amountRaw / rate;
+
+    const { data: row, error } = await supabase
+      .from('income')
+      .insert({
+        network,
+        description,
+        amount: amountRaw,
+        currency,
+        exchange_rate: rate,
+        amount_mad,
+        amount_usd,
+        income_date: incomeDate,
+      })
+      .select('id')
+      .single();
+
+    if (error) throw error;
+    revalidatePath('/income');
+    return { success: true, data: { id: row.id } };
+  } catch (error) {
+    return { error: (error as Error).message };
+  }
+}
+
+export async function deleteIncome(id: number): Promise<ActionResponse> {
+  try {
+    await supabase.from('income').delete().eq('id', id);
+    revalidatePath('/income');
+    return { success: true };
+  } catch (error) {
+    return { error: (error as Error).message };
+  }
+}
+
+export type NetworkBucket = { usd: number; mad: number; count: number };
+
+export type IncomeSummary = {
+  rate: number;
+  totalUSD: number;
+  totalMAD: number;
+  perNetwork: Record<IncomeNetwork, NetworkBucket>;
+  splitPctMarwan: number;
+  splitPctAbdsamad: number;
+  marwanUSD: number;
+  marwanMAD: number;
+  abdsamadUSD: number;
+  abdsamadMAD: number;
+  entries: number;
+};
+
+export async function getIncomeSummary(): Promise<IncomeSummary> {
+  const rate = await getExchangeRate();
+  const pctMarwan = await getIncomeSplitPct();
+  const pctAbdsamad = 100 - pctMarwan;
+
+  const { data: rows } = await supabase
+    .from('income')
+    .select('network, amount_usd, amount_mad');
+
+  const empty = (): NetworkBucket => ({ usd: 0, mad: 0, count: 0 });
+  const perNetwork: Record<IncomeNetwork, NetworkBucket> = {
+    admob: empty(),
+    applovin: empty(),
+    audience_network: empty(),
+    pangle: empty(),
+    unity: empty(),
+  };
+
+  let totalUSD = 0;
+  let totalMAD = 0;
+
+  for (const r of rows || []) {
+    const bucket = perNetwork[r.network as IncomeNetwork];
+    if (!bucket) continue;
+    bucket.usd += Number(r.amount_usd) || 0;
+    bucket.mad += Number(r.amount_mad) || 0;
+    bucket.count += 1;
+    totalUSD += Number(r.amount_usd) || 0;
+    totalMAD += Number(r.amount_mad) || 0;
+  }
+
+  return {
+    rate,
+    totalUSD,
+    totalMAD,
+    perNetwork,
+    splitPctMarwan: pctMarwan,
+    splitPctAbdsamad: pctAbdsamad,
+    marwanUSD: (totalUSD * pctMarwan) / 100,
+    marwanMAD: (totalMAD * pctMarwan) / 100,
+    abdsamadUSD: (totalUSD * pctAbdsamad) / 100,
+    abdsamadMAD: (totalMAD * pctAbdsamad) / 100,
+    entries: (rows || []).length,
+  };
+}
+
 // ── Companies ─────────────────────────────────────────────────────────────────
 
 export async function getCompanies() {

@@ -31,6 +31,6 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 export function canAccess(user: AuthUser | null, pathname: string): boolean {
   if (!user) return false;
   if (user.role === 'admin') return true;
-  if (pathname.startsWith('/expenses') || pathname.startsWith('/nitch')) return false;
+  if (pathname.startsWith('/expenses') || pathname.startsWith('/income') || pathname.startsWith('/nitch')) return false;
   return true;
 }

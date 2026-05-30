@@ -131,6 +131,30 @@ CREATE TABLE IF NOT EXISTS settings (
 INSERT INTO settings (key, value) VALUES ('usd_mad_rate', '10.00')
 ON CONFLICT (key) DO NOTHING;
 
+-- Default split note for the Income page (editable from the UI)
+INSERT INTO settings (key, value) VALUES (
+  'income_split_note',
+  'After the network pays out, we split the net amount 50/50 between Marwan & Abdsamad. Half is reinvested into ads, new accounts and tooling — the other half goes to each partner''s personal account.'
+)
+ON CONFLICT (key) DO NOTHING;
+
+-- Income: every payout we received from an ad network
+CREATE TABLE IF NOT EXISTS income (
+  id BIGSERIAL PRIMARY KEY,
+  network TEXT NOT NULL,
+  amount DOUBLE PRECISION NOT NULL,
+  currency TEXT NOT NULL,
+  exchange_rate DOUBLE PRECISION NOT NULL,
+  amount_mad DOUBLE PRECISION NOT NULL,
+  amount_usd DOUBLE PRECISION NOT NULL,
+  income_date TEXT,
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS income_network_idx ON income(network);
+CREATE INDEX IF NOT EXISTS income_date_idx    ON income(income_date DESC);
+
 CREATE TABLE IF NOT EXISTS companies (
   id BIGSERIAL PRIMARY KEY,
   name TEXT NOT NULL,
@@ -232,6 +256,7 @@ ALTER TABLE app_screenshots DISABLE ROW LEVEL SECURITY;
 ALTER TABLE version_screenshots DISABLE ROW LEVEL SECURITY;
 ALTER TABLE listing_versions DISABLE ROW LEVEL SECURITY;
 ALTER TABLE expenses DISABLE ROW LEVEL SECURITY;
+ALTER TABLE income DISABLE ROW LEVEL SECURITY;
 ALTER TABLE settings DISABLE ROW LEVEL SECURITY;
 ALTER TABLE companies DISABLE ROW LEVEL SECURITY;
 ALTER TABLE company_documents DISABLE ROW LEVEL SECURITY;
