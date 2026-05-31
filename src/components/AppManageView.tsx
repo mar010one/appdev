@@ -338,105 +338,17 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
           </div>
 
           <form onSubmit={handleSubmitVersion} className="version-form">
-            <div className="version-form-row">
-              <div className="input-field">
-                <label>Version Number</label>
-                <div className="input-with-icon-large">
-                  <Hash size={20} />
-                  <input
-                    type="text"
-                    placeholder="e.g. 1.0.1"
-                    value={versionNumber}
-                    onChange={(e) => setVersionNumber(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="input-field">
-                <label>AAB / IPA Binary</label>
-                <div className="aab-mode-toggle" style={{ marginBottom: 8 }}>
-                  <button
-                    type="button"
-                    className={`aab-mode-btn ${aabInputMode === 'file' ? 'active' : ''}`}
-                    onClick={() => { setAabInputMode('file'); setAabExternalLink(''); }}
-                  >
-                    <Upload size={13} /> Upload file
-                  </button>
-                  <button
-                    type="button"
-                    className={`aab-mode-btn ${aabInputMode === 'link' ? 'active' : ''}`}
-                    onClick={() => { setAabInputMode('link'); setAabFile(null); if (aabInputRef.current) aabInputRef.current.value = ''; }}
-                  >
-                    <ExternalLink size={13} /> Paste link
-                  </button>
-                </div>
-                {aabInputMode === 'file' ? (
-                  aabFile ? (
-                    <div className="aab-drop aab-drop-has-file">
-                      <Upload size={18} />
-                      <span className="aab-drop-name">{aabFile.name}</span>
-                      <button
-                        type="button"
-                        className="aab-drop-remove"
-                        onClick={() => { setAabFile(null); if (aabInputRef.current) aabInputRef.current.value = ''; }}
-                        title="Remove"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  ) : (
-                    <label className="aab-drop">
-                      <Upload size={18} />
-                      <span>Choose file…</span>
-                      <input
-                        ref={aabInputRef}
-                        type="file"
-                        onChange={handleAabChange}
-                        accept=".aab,.ipa,.apk,application/octet-stream"
-                      />
-                    </label>
-                  )
-                ) : (
-                  <div className="aab-link-section aab-link-section-compact">
-                    <div className="aab-link-hint" style={{ marginBottom: 6 }}>
-                      Supabase limit is 50 MB — upload to SendSpace or MediaFire and paste the link.
-                    </div>
-                    <div className="aab-link-row">
-                      <div className="aab-link-input-wrap">
-                        <ExternalLink size={14} className="aab-link-icon" />
-                        <input
-                          type="url"
-                          className="aab-link-input"
-                          placeholder="Paste SendSpace or MediaFire link…"
-                          value={aabExternalLink}
-                          onChange={(e) => setAabExternalLink(e.target.value)}
-                        />
-                        {aabExternalLink && (
-                          <button
-                            type="button"
-                            className="aab-link-clear"
-                            onClick={() => setAabExternalLink('')}
-                          >
-                            <X size={13} />
-                          </button>
-                        )}
-                      </div>
-                      <a
-                        href="https://www.sendspace.com"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="aab-host-btn sendspace"
-                      >
-                        <Upload size={13} /> SendSpace
-                      </a>
-                    </div>
-                    {aabExternalLink && (
-                      <div className="aab-link-preview">
-                        <Check size={12} color="#22c55e" /> Link ready
-                      </div>
-                    )}
-                  </div>
-                )}
+            <div className="input-field">
+              <label>Version Number</label>
+              <div className="input-with-icon-large">
+                <Hash size={20} />
+                <input
+                  type="text"
+                  placeholder="e.g. 1.0.1"
+                  value={versionNumber}
+                  onChange={(e) => setVersionNumber(e.target.value)}
+                  required
+                />
               </div>
             </div>
 
@@ -586,6 +498,93 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
               </div>
             </div>
 
+            <div className="input-field">
+              <label>AAB / IPA Binary</label>
+              <div className="aab-mode-toggle" style={{ marginBottom: 8 }}>
+                <button
+                  type="button"
+                  className={`aab-mode-btn ${aabInputMode === 'file' ? 'active' : ''}`}
+                  onClick={() => { setAabInputMode('file'); setAabExternalLink(''); }}
+                >
+                  <Upload size={13} /> Upload file
+                </button>
+                <button
+                  type="button"
+                  className={`aab-mode-btn ${aabInputMode === 'link' ? 'active' : ''}`}
+                  onClick={() => { setAabInputMode('link'); setAabFile(null); if (aabInputRef.current) aabInputRef.current.value = ''; }}
+                >
+                  <ExternalLink size={13} /> Paste link
+                </button>
+              </div>
+              {aabInputMode === 'file' ? (
+                aabFile ? (
+                  <div className="aab-drop aab-drop-has-file">
+                    <Upload size={18} />
+                    <span className="aab-drop-name">{aabFile.name}</span>
+                    <button
+                      type="button"
+                      className="aab-drop-remove"
+                      onClick={() => { setAabFile(null); if (aabInputRef.current) aabInputRef.current.value = ''; }}
+                      title="Remove"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="aab-drop">
+                    <Upload size={18} />
+                    <span>Choose file…</span>
+                    <input
+                      ref={aabInputRef}
+                      type="file"
+                      onChange={handleAabChange}
+                      accept=".aab,.ipa,.apk,application/octet-stream"
+                    />
+                  </label>
+                )
+              ) : (
+                <div className="aab-link-section aab-link-section-compact">
+                  <div className="aab-link-hint" style={{ marginBottom: 6 }}>
+                    Supabase limit is 50 MB — upload to SendSpace or MediaFire and paste the link.
+                  </div>
+                  <div className="aab-link-row">
+                    <div className="aab-link-input-wrap">
+                      <ExternalLink size={14} className="aab-link-icon" />
+                      <input
+                        type="url"
+                        className="aab-link-input"
+                        placeholder="Paste SendSpace or MediaFire link…"
+                        value={aabExternalLink}
+                        onChange={(e) => setAabExternalLink(e.target.value)}
+                      />
+                      {aabExternalLink && (
+                        <button
+                          type="button"
+                          className="aab-link-clear"
+                          onClick={() => setAabExternalLink('')}
+                        >
+                          <X size={13} />
+                        </button>
+                      )}
+                    </div>
+                    <a
+                      href="https://www.sendspace.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="aab-host-btn sendspace"
+                    >
+                      <Upload size={13} /> SendSpace
+                    </a>
+                  </div>
+                  {aabExternalLink && (
+                    <div className="aab-link-preview">
+                      <Check size={12} color="#22c55e" /> Link ready
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             <label className="manage-toggle">
               <input
                 type="checkbox"
@@ -664,9 +663,18 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
                             version_number: v.version_number,
                             changelog: v.changelog,
                             release_date: v.release_date,
+                            file_path: v.file_path,
+                            icon_path: v.icon_path,
+                            promo_path: v.promo_path,
+                            screenshots: v.screenshots,
+                          }}
+                          app={{
+                            name: app.name,
+                            short_description: app.short_description,
+                            long_description: app.long_description,
                           }}
                           isLatest={isLatest}
-                          triggerLabel={isLatest ? 'Edit current' : undefined}
+                          triggerLabel={isLatest ? 'Edit current' : 'Edit'}
                         />
                         <button
                           type="button"

@@ -636,6 +636,16 @@ export async function updateVersion(
 
     if (!versionNumber) return { error: 'Version number is required.' };
 
+    const { data: existing, error: lookupErr } = await supabase
+      .from('versions')
+      .select('app_id, file_path, icon_path, promo_path')
+      .eq('id', versionId)
+      .single();
+    if (lookupErr) throw lookupErr;
+    if (!existing) return { error: 'Version not found.' };
+
+    const appId = existing.app_id;
+
     const updates: Record<string, any> = {
       version_number: versionNumber,
       changelog,
@@ -645,13 +655,60 @@ export async function updateVersion(
       if (!Number.isNaN(dt.getTime())) updates.release_date = dt.toISOString();
     }
 
-    const { data: existing, error: lookupErr } = await supabase
-      .from('versions')
-      .select('app_id')
-      .eq('id', versionId)
-      .single();
-    if (lookupErr) throw lookupErr;
-    if (!existing) return { error: 'Version not found.' };
+    // ── Binary (AAB / IPA): replace with a new file/link, or remove ──
+    const fileExternalLink = ((formData.get('fileExternalLink') as string) || '').trim();
+    const newFile = formData.get('file');
+    const hasNewFile = !!newFile && (typeof newFile === 'string'
+      ? newFile.trim() !== ''
+      : (newFile as any).size > 0);
+    const removeFile = (formData.get('removeFile') as string) === '1';
+    if (fileExternalLink) {
+      if (existing.file_path && existing.file_path !== fileExternalLink) await deleteFile(existing.file_path);
+      updates.file_path = fileExternalLink;
+    } else if (hasNewFile) {
+      const p = await saveUploadedFile(newFile, 'apps');
+      if (p) {
+        await deleteFile(existing.file_path);
+        updates.file_path = p;
+      }
+    } else if (removeFile) {
+      await deleteFile(existing.file_path);
+      updates.file_path = null;
+    }
+
+    // ── Icon: replace or remove ──
+    const newIcon = formData.get('iconSmall');
+    const removeIcon = (formData.get('removeIcon') as string) === '1';
+    let iconPath: string | null = existing.icon_path ?? null;
+    if (newIcon) {
+      const p = await saveUploadedFile(newIcon, 'icons', 'v-small-');
+      if (p) {
+        await deleteFile(existing.icon_path);
+        updates.icon_path = p;
+        iconPath = p;
+      }
+    } else if (removeIcon) {
+      await deleteFile(existing.icon_path);
+      updates.icon_path = null;
+      iconPath = null;
+    }
+
+    // ── Promo / splash graphic: replace or remove ──
+    const newPromo = formData.get('iconLarge');
+    const removePromo = (formData.get('removePromo') as string) === '1';
+    let promoPath: string | null = existing.promo_path ?? null;
+    if (newPromo) {
+      const p = await saveUploadedFile(newPromo, 'icons', 'v-large-');
+      if (p) {
+        await deleteFile(existing.promo_path);
+        updates.promo_path = p;
+        promoPath = p;
+      }
+    } else if (removePromo) {
+      await deleteFile(existing.promo_path);
+      updates.promo_path = null;
+      promoPath = null;
+    }
 
     const { error } = await supabase
       .from('versions')
@@ -659,8 +716,67 @@ export async function updateVersion(
       .eq('id', versionId);
     if (error) throw error;
 
-    revalidatePath(`/apps/${existing.app_id}`);
-    revalidatePath(`/apps/${existing.app_id}/info`);
+    // ── Screenshots: reconcile to (kept existing + newly uploaded) ──
+    // The client always sends `keptScreenshots` when the editor is used, so its
+    // presence signals that the screenshot set should be reconciled.
+    let finalShots: string[] | null = null;
+    if (formData.has('keptScreenshots')) {
+      let kept: string[] = [];
+      try {
+        const a = JSON.parse((formData.get('keptScreenshots') as string) || '[]');
+        if (Array.isArray(a)) kept = a.filter((x) => typeof x === 'string');
+      } catch {}
+
+      const { data: current } = await supabase
+        .from('version_screenshots')
+        .select('id, file_path')
+        .eq('version_id', versionId);
+
+      for (const s of current || []) {
+        if (!kept.includes(s.file_path)) {
+          await supabase.from('version_screenshots').delete().eq('id', s.id);
+          await deleteFile(s.file_path);
+        }
+      }
+
+      const added: string[] = [];
+      for (let i = 0; i < 8; i++) {
+        const p = await saveUploadedFile(formData.get(`screenshot_${i}`), 'screenshots', 'v-');
+        if (p) {
+          await supabase.from('version_screenshots').insert({ version_id: versionId, file_path: p });
+          added.push(p);
+        }
+      }
+      finalShots = [...kept, ...added].slice(0, 8);
+    }
+
+    // ── Optionally push this version's content to the app's live listing ──
+    const updateAppAssets = (formData.get('updateAppAssets') as string) === '1';
+    const appUpdates: Record<string, any> = {};
+    const name = (formData.get('name') as string | null)?.trim();
+    const shortDescription = formData.get('shortDescription') as string | null;
+    const longDescription = formData.get('longDescription') as string | null;
+    if (name) appUpdates.name = name;
+    if (shortDescription !== null) appUpdates.short_description = shortDescription;
+    if (longDescription !== null) appUpdates.long_description = longDescription;
+    if (updateAppAssets) {
+      if (iconPath) appUpdates.icon_small_path = iconPath;
+      if (promoPath) appUpdates.icon_large_path = promoPath;
+    }
+    if (Object.keys(appUpdates).length) {
+      await supabase.from('apps').update(appUpdates).eq('id', appId);
+    }
+    if (updateAppAssets && finalShots) {
+      // Keep old screenshot files in storage — earlier listing_versions
+      // snapshots still reference them.
+      await supabase.from('app_screenshots').delete().eq('app_id', appId);
+      for (const p of finalShots) {
+        await supabase.from('app_screenshots').insert({ app_id: appId, file_path: p });
+      }
+    }
+
+    revalidatePath(`/apps/${appId}`);
+    revalidatePath(`/apps/${appId}/info`);
     revalidatePath('/share/[id]', 'page');
     revalidatePath('/versions');
     revalidatePath('/apps');
