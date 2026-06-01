@@ -9,6 +9,7 @@ import {
   ExternalLink, Copy, Info, Edit3, RefreshCw, Type, AlignLeft,
 } from 'lucide-react';
 import EditAppModal from './EditAppModal';
+import ChangeAccountModal from './ChangeAccountModal';
 import EditVersionModal from './EditVersionModal';
 import ListingVersionModal from './ListingVersionModal';
 import AppStatusMenu from './AppStatusMenu';
@@ -44,6 +45,7 @@ type App = {
   website_url?: string;
   status?: string;
   status_updated_at?: string;
+  account_id?: number;
   account_email?: string;
   account_developer_name?: string;
   account_developer_id?: string;
@@ -74,7 +76,16 @@ function fileNameFromPath(p?: string) {
   return p.split('/').pop() || 'file';
 }
 
-export default function AppManageView({ app, versions }: { app: App; versions: Version[] }) {
+type Account = {
+  id: number;
+  type?: string;
+  developer_name?: string;
+  developer_id?: string;
+  email?: string;
+  website?: string;
+};
+
+export default function AppManageView({ app, versions, accounts = [] }: { app: App; versions: Version[]; accounts?: Account[] }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
 
@@ -317,6 +328,7 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
         </div>
         <div className="info-hero-actions">
           <EditAppModal app={app} />
+          <ChangeAccountModal app={app} accounts={accounts} />
           <AppShareLinkButton
             appId={app.id}
             shareActive={!!app.share_active}

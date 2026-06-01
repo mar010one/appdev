@@ -2,6 +2,7 @@
 
 import { supabase } from './db';
 import { revalidatePath } from 'next/cache';
+import { deriveDefaultPrivacyUrl } from './derive';
 
 export type ActionResponse<T = any> = {
   success?: boolean;
@@ -1131,6 +1132,64 @@ export async function updateApp(id: number, formData: FormData) {
     return { success: true };
   } catch (error) {
     console.error('Error in updateApp:', error);
+    return { error: (error as Error).message };
+  }
+}
+
+/**
+ * Move an app to a different developer account.
+ *
+ * The developer name / id / type / account email shown on the listing are
+ * joined from `accounts` via `account_id`, so they refresh automatically once
+ * the foreign key changes. When `syncContactInfo` is true (the default), the
+ * app's own listing contact details — contact email, website, and the derived
+ * privacy URL — are re-pulled from the new account, mirroring how they're
+ * auto-filled when an app is first created.
+ */
+export async function changeAppAccount(
+  appId: number,
+  accountId: number,
+  syncContactInfo = true,
+): Promise<ActionResponse> {
+  try {
+    if (!appId || !accountId) return { error: 'Missing app or developer account.' };
+
+    // Confirm the target account exists and grab its contact details.
+    const { data: account, error: accErr } = await supabase
+      .from('accounts')
+      .select('id, email, website')
+      .eq('id', accountId)
+      .single();
+    if (accErr || !account) return { error: 'That developer account no longer exists.' };
+
+    const updates: Record<string, any> = { account_id: accountId };
+    if (syncContactInfo) {
+      updates.contact_email = account.email || '';
+      updates.website_url = account.website || '';
+      updates.privacy_url = deriveDefaultPrivacyUrl(account.website);
+    }
+
+    const { data: updated, error: updateErr } = await supabase
+      .from('apps')
+      .update(updates)
+      .eq('id', appId)
+      .select('id')
+      .single();
+    if (updateErr) throw updateErr;
+    if (!updated) return { error: `No app with id=${appId} was found.` };
+
+    // Capture the new contact details as a listing snapshot, matching updateApp.
+    await snapshotListing(appId);
+
+    revalidatePath('/apps');
+    revalidatePath(`/apps/${appId}`);
+    revalidatePath(`/apps/${appId}/info`);
+    revalidatePath('/share/[id]', 'page');
+    revalidatePath('/accounts');
+    revalidatePath('/');
+    return { success: true };
+  } catch (error) {
+    console.error('Error in changeAppAccount:', error);
     return { error: (error as Error).message };
   }
 }

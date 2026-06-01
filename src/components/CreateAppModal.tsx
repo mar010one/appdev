@@ -13,6 +13,7 @@ import {
 import { addApp, generateAppDescriptions, generateDescriptionField } from '@/lib/actions';
 import { uploadFilesInForm } from '@/lib/upload-client';
 import { resizeImageToFile } from '@/lib/resize-image';
+import { deriveDefaultPrivacyUrl } from '@/lib/derive';
 import ModalPortal from './ModalPortal';
 
 type Account = {
@@ -26,19 +27,6 @@ type Account = {
 };
 
 const TOTAL_STEPS = 4;
-
-function deriveDefaultPrivacyUrl(website?: string) {
-  if (!website) return '';
-  try {
-    const u = new URL(website);
-    // Use the host root + /privacy.html (per requirement)
-    return `${u.protocol}//${u.host}/privacy.html`;
-  } catch {
-    // Fallback: append the path if user typed bare domain
-    const trimmed = website.replace(/\/+$/, '');
-    return `${trimmed}/privacy.html`;
-  }
-}
 
 // Mirrors Google Play's "Application" category list. Keep in sync with the
 // dropdown shown in EditAppModal.

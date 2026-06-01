@@ -1,4 +1,4 @@
-import { getAppById, getVersions } from '@/lib/actions';
+import { getAppById, getVersions, getAccounts } from '@/lib/actions';
 import { notFound } from 'next/navigation';
 import AppManageView from '@/components/AppManageView';
 
@@ -7,11 +7,12 @@ export default async function AppDetailsPage({ params }: { params: Promise<{ id:
   const appId = parseInt(id, 10);
   if (Number.isNaN(appId)) return notFound();
 
-  const [app, versions] = await Promise.all([
+  const [app, versions, accounts] = await Promise.all([
     getAppById(appId),
     getVersions(appId) as Promise<any[]>,
+    getAccounts() as Promise<any[]>,
   ]);
   if (!app) return notFound();
 
-  return <AppManageView app={app} versions={versions} />;
+  return <AppManageView app={app} versions={versions} accounts={accounts} />;
 }
