@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ArrowLeft, Smartphone, Hash, Plus, Loader2, Check, FileDown, Upload,
   Image as ImageIcon, FileImage, X, Trash2, History, GitCommit, Sparkles,
@@ -74,6 +75,7 @@ function fileNameFromPath(p?: string) {
 }
 
 export default function AppManageView({ app, versions }: { app: App; versions: Version[] }) {
+  const router = useRouter();
   const [, startTransition] = useTransition();
 
   // ---- New version form state ----
@@ -278,9 +280,9 @@ export default function AppManageView({ app, versions }: { app: App; versions: V
 
   return (
     <div className="container animate-in app-manage-page">
-      <Link href={`/accounts`} className="back-link">
+      <button type="button" onClick={() => router.back()} className="back-link">
         <ArrowLeft size={16} /> Back
-      </Link>
+      </button>
 
       {/* Hero */}
       <header className="info-hero glass-card">

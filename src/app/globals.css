@@ -4341,6 +4341,11 @@ select option {
   margin-bottom: 24px;
   font-weight: 600;
   font-size: 0.9rem;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  cursor: pointer;
 }
 
 .app-manage-page .back-link:hover { color: var(--foreground); }
