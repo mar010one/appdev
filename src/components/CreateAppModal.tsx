@@ -8,13 +8,18 @@ import {
   ChevronRight, ChevronLeft, Check,
   User, Image as ImageIcon, Mail, ShieldCheck, Link as LinkIcon,
   Minus, Tag, BadgeCheck, Wand2, RefreshCw,
-  Package, Upload, AlertCircle, Layers
+  Package, Upload, AlertCircle, Layers, Copy
 } from 'lucide-react';
 import { addApp, generateAppDescriptions, generateDescriptionField } from '@/lib/actions';
 import { uploadFilesInForm } from '@/lib/upload-client';
 import { resizeImageToFile } from '@/lib/resize-image';
 import { deriveDefaultPrivacyUrl } from '@/lib/derive';
 import ModalPortal from './ModalPortal';
+import CustomListingsEditor, {
+  CustomListingDraft,
+  appendCustomListingsToForm,
+  customListingUploadBuckets,
+} from './CustomListingsEditor';
 
 type Account = {
   id: number;
@@ -26,7 +31,7 @@ type Account = {
   phone?: string;
 };
 
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 5;
 
 // Mirrors Google Play's "Application" category list. Keep in sync with the
 // dropdown shown in EditAppModal.
@@ -99,6 +104,9 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
   const [storeUrlTouched, setStoreUrlTouched] = useState(false);
   const [shortDesc, setShortDesc] = useState('');
   const [longDesc, setLongDesc] = useState('');
+
+  // Optional custom store listings (alternative name/desc/icon/screenshots)
+  const [customListings, setCustomListings] = useState<CustomListingDraft[]>([]);
 
   // Contact & compliance
   const [contactEmail, setContactEmail] = useState('');
@@ -307,6 +315,9 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
       formData.append(`screenshot_${index}`, file);
     });
 
+    // Append optional custom store listings (text meta + their files)
+    appendCustomListingsToForm(formData, customListings);
+
     try {
       await uploadFilesInForm(formData, {
         iconSmall: { bucket: 'icons', prefix: 'small-' },
@@ -320,6 +331,7 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
         screenshot_5: { bucket: 'screenshots', prefix: 'shot-5-' },
         screenshot_6: { bucket: 'screenshots', prefix: 'shot-6-' },
         screenshot_7: { bucket: 'screenshots', prefix: 'shot-7-' },
+        ...customListingUploadBuckets(customListings.length),
       });
     } catch (e: any) {
       setIsPending(false);
@@ -357,6 +369,7 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
     setStoreUrlTouched(false);
     setShortDesc('');
     setLongDesc('');
+    setCustomListings([]);
     setContactEmail('');
     setPrivacyUrl('');
     setWebsiteUrl('');
@@ -432,25 +445,28 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
     1: 'App Identity',
     2: 'Content Studio',
     3: 'Visual Assets',
-    4: 'Contact & Compliance',
+    4: 'CL',
+    5: 'Contact & Compliance',
   };
 
   const nextStepLabels: Record<number, string> = {
     1: 'Content Studio',
     2: 'Visual Assets',
-    3: 'Contact & Compliance',
+    3: 'CL',
+    4: 'Contact & Compliance',
   };
 
   const stepIcons = [
     <User key={1} size={20} />,
     <Layers key={2} size={20} />,
     <ImageIcon key={3} size={20} />,
-    <ShieldCheck key={4} size={20} />,
+    <Copy key={4} size={20} />,
+    <ShieldCheck key={5} size={20} />,
   ];
 
   const StepIndicator = () => (
     <div className="stepper-container">
-      {[1, 2, 3, 4].map((s) => (
+      {[1, 2, 3, 4, 5].map((s) => (
         <div key={s} className={`step-item ${step === s ? 'active' : ''} ${step > s ? 'completed' : ''}`}>
           <div className="step-circle">
             {step > s ? <Check size={18} /> : step === s ? stepIcons[s - 1] : s}
@@ -1059,7 +1075,7 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
                           <span>Upload up to 8 images (Phone/Tablet)</span>
                         </div>
                         {screenshotPreviews.length < 8 && (
-                          <div className="btn btn-secondary btn-small relative">
+                          <label className="btn btn-secondary btn-small relative" style={{ cursor: 'pointer' }}>
                             <Plus size={16} /> Add Screenshots
                             <input
                               type="file"
@@ -1068,7 +1084,7 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
                               className="hidden-input"
                               onChange={(e) => handleFileChange(e, 'screenshots')}
                             />
-                          </div>
+                          </label>
                         )}
                       </div>
 
@@ -1083,7 +1099,7 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
                         ))}
 
                         {screenshotPreviews.length === 0 && (
-                          <div className="screenshot-placeholder">
+                          <label className="screenshot-placeholder" style={{ cursor: 'pointer' }}>
                             <Smartphone size={32} />
                             <p>No screenshots uploaded yet</p>
                             <input
@@ -1093,7 +1109,7 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
                               className="hidden-input"
                               onChange={(e) => handleFileChange(e, 'screenshots')}
                             />
-                          </div>
+                          </label>
                         )}
                       </div>
                     </div>
@@ -1255,8 +1271,15 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
                 </div>
               )}
 
-              {/* STEP 4: CONTACT & COMPLIANCE */}
+              {/* STEP 4: CUSTOM STORE LISTINGS */}
               {step === 4 && (
+                <div className="step-fade-in max-w-screen">
+                  <CustomListingsEditor value={customListings} onChange={setCustomListings} />
+                </div>
+              )}
+
+              {/* STEP 5: CONTACT & COMPLIANCE */}
+              {step === 5 && (
                 <div className="step-fade-in max-w-screen">
                   <div className="section-title">
                     <ShieldCheck size={24} color="var(--accent)" />
@@ -1363,7 +1386,7 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
               </button>
 
               <div className="step-dots">
-                {[1, 2, 3, 4].map(s => (
+                {[1, 2, 3, 4, 5].map(s => (
                   <span
                     key={s}
                     className={`step-dot ${s < step ? 'done' : s === step ? 'current' : ''}`}

@@ -327,7 +327,7 @@ export default function AppManageView({ app, versions, accounts = [] }: { app: A
           </div>
         </div>
         <div className="info-hero-actions">
-          <EditAppModal app={app} />
+          <EditAppModal app={app} triggerLabel="Edit listing" />
           <ChangeAccountModal app={app} accounts={accounts} />
           <AppShareLinkButton
             appId={app.id}
@@ -340,6 +340,57 @@ export default function AppManageView({ app, versions, accounts = [] }: { app: A
           </Link>
         </div>
       </header>
+
+      {/* Current listing assets — visible without opening Listing Info */}
+      <section className="glass-card current-listing-card" style={{ marginBottom: 20 }}>
+        <div className="info-section-head">
+          <h2 style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <ImageIcon size={20} /> Current listing assets
+          </h2>
+          <div style={{ display: 'inline-flex', gap: 8, marginLeft: 'auto' }}>
+            <EditAppModal app={app} triggerLabel="Edit images" initialTab="assets" />
+            <Link href={`/apps/${app.id}/info`} className="btn btn-secondary small">
+              <Info size={14} /> Full listing info
+            </Link>
+          </div>
+        </div>
+
+        {(app.icon_small_path || app.icon_large_path || (app.screenshots && app.screenshots.length > 0)) ? (
+          <div className="version-assets-preview">
+            {app.icon_small_path && (
+              <a href={app.icon_small_path} download={fileNameFromPath(app.icon_small_path)} className="version-asset-thumb" title="App icon · 512 × 512">
+                <img src={app.icon_small_path} alt="icon" />
+                <span>Icon</span>
+              </a>
+            )}
+            {app.icon_large_path && (
+              <a href={app.icon_large_path} download={fileNameFromPath(app.icon_large_path)} className="version-asset-thumb wide" title="Promo graphic · 1024 × 500">
+                <img src={app.icon_large_path} alt="promo" />
+                <span>Promo</span>
+              </a>
+            )}
+            {app.screenshots && app.screenshots.length > 0 && (
+              <div className="version-shots-strip">
+                {app.screenshots.map(s => (
+                  <a key={s.id} href={s.file_path} download={fileNameFromPath(s.file_path)} className="version-shot-thumb" title="Screenshot">
+                    <img src={s.file_path} alt="screenshot" />
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="empty-screens" style={{ marginTop: 8 }}>
+            <ImageIcon size={28} />
+            <p>No images in the current listing yet. Use “Edit images” to add an icon, promo and screenshots.</p>
+          </div>
+        )}
+        {(app.icon_small_path || app.icon_large_path) && (!app.screenshots || app.screenshots.length === 0) && (
+          <p className="text-muted" style={{ fontSize: '0.85rem', marginTop: 10 }}>
+            No screenshots in the current listing yet — add them with “Edit images”.
+          </p>
+        )}
+      </section>
 
       {/* Body */}
       <div className="manage-grid">

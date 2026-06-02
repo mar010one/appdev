@@ -342,14 +342,16 @@ export async function addAccount(formData: FormData): Promise<ActionResponse> {
 
 // ── Listing snapshots ─────────────────────────────────────────────────────────
 
-async function snapshotListing(appId: number, releaseFilePath?: string) {
+// Gather the current listing fields from the app + its screenshots, shaped for a
+// listing_versions row (without the label / release file, which the callers set).
+async function gatherListingSnapshotFields(appId: number) {
   const { data: app, error: appErr } = await supabase
     .from('apps')
     .select('*')
     .eq('id', appId)
     .single();
   if (appErr) throw appErr;
-  if (!app) return;
+  if (!app) return null;
 
   const { data: shots, error: shotsErr } = await supabase
     .from('app_screenshots')
@@ -357,6 +359,26 @@ async function snapshotListing(appId: number, releaseFilePath?: string) {
     .eq('app_id', appId)
     .order('id', { ascending: true });
   if (shotsErr) throw shotsErr;
+
+  return {
+    name: app.name,
+    short_description: app.short_description,
+    long_description: app.long_description,
+    icon_small_path: app.icon_small_path,
+    icon_large_path: app.icon_large_path,
+    store_url: app.store_url,
+    contact_email: app.contact_email,
+    privacy_url: app.privacy_url,
+    website_url: app.website_url,
+    screenshots_json: JSON.stringify((shots || []).map((s: any) => s.file_path)),
+  };
+}
+
+// Append a brand-new listing version snapshot. Used when a genuinely new release
+// is published ("Publish new version").
+async function snapshotListing(appId: number, releaseFilePath?: string) {
+  const fields = await gatherListingSnapshotFields(appId);
+  if (!fields) return;
 
   const { count: existingCount } = await supabase
     .from('listing_versions')
@@ -368,19 +390,42 @@ async function snapshotListing(appId: number, releaseFilePath?: string) {
   const { error: insertErr } = await supabase.from('listing_versions').insert({
     app_id: appId,
     version_label: label,
-    name: app.name,
-    short_description: app.short_description,
-    long_description: app.long_description,
-    icon_small_path: app.icon_small_path,
-    icon_large_path: app.icon_large_path,
-    store_url: app.store_url,
-    contact_email: app.contact_email,
-    privacy_url: app.privacy_url,
-    website_url: app.website_url,
-    screenshots_json: JSON.stringify((shots || []).map((s: any) => s.file_path)),
+    ...fields,
     release_file_path: releaseFilePath || null,
   });
   if (insertErr) throw insertErr;
+}
+
+// Update the current (latest) listing snapshot in place — used when EDITING the
+// original app. Editing the original listing should NOT pile up as new versions,
+// it just refreshes the current snapshot. Creates v1 if none exists yet.
+async function updateCurrentListingSnapshot(appId: number) {
+  const fields = await gatherListingSnapshotFields(appId);
+  if (!fields) return;
+
+  const { data: rows } = await supabase
+    .from('listing_versions')
+    .select('id')
+    .eq('app_id', appId)
+    .order('id', { ascending: false })
+    .limit(1);
+  const latest = rows?.[0];
+
+  if (latest) {
+    const { error } = await supabase
+      .from('listing_versions')
+      .update(fields)
+      .eq('id', latest.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from('listing_versions').insert({
+      app_id: appId,
+      version_label: 'v1',
+      ...fields,
+      release_file_path: null,
+    });
+    if (error) throw error;
+  }
 }
 
 export async function getListingVersions(appId: number) {
@@ -453,6 +498,125 @@ export async function getApps(accountId?: number) {
   });
 }
 
+// ── Custom store listings ───────────────────────────────────────────────────
+// One app can have several alternative ("custom") listings — each with its own
+// name, descriptions, icon and screenshots. The client sends a `customListings`
+// JSON array (text + already-uploaded existing URLs) plus, per listing index,
+// any freshly uploaded files under `custom_<i>_icon` / `custom_<i>_shots`
+// (replaced with public URLs by uploadFilesInForm before they reach here).
+//
+// Persistence: stored as a single JSON blob in the existing `settings` table
+// (key `custom_listings:app:<id>`). This avoids needing a dedicated table /
+// migration — the feature works against any Supabase project out of the box.
+type CustomListingMeta = {
+  id?: number;
+  name?: string;
+  short_description?: string;
+  long_description?: string;
+  icon?: string;            // existing icon URL to keep ('' = none)
+  keptScreenshots?: string[]; // existing screenshot URLs to keep
+};
+
+export type CustomListing = {
+  id: number;
+  name: string;
+  short_description: string;
+  long_description: string;
+  icon_path: string;
+  screenshots: string[];
+};
+
+function customListingsKey(appId: number) {
+  return `custom_listings:app:${appId}`;
+}
+
+// Read the stored custom listings for an app (empty array if none / unset).
+async function readCustomListings(appId: number): Promise<CustomListing[]> {
+  try {
+    const { data } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', customListingsKey(appId))
+      .maybeSingle();
+    if (!data?.value) return [];
+    const arr = JSON.parse(data.value);
+    if (!Array.isArray(arr)) return [];
+    return arr.map((c: any, i: number) => ({
+      id: typeof c.id === 'number' ? c.id : i + 1,
+      name: c.name || '',
+      short_description: c.short_description || '',
+      long_description: c.long_description || '',
+      icon_path: c.icon_path || '',
+      screenshots: Array.isArray(c.screenshots)
+        ? c.screenshots.filter((s: unknown) => typeof s === 'string')
+        : [],
+    }));
+  } catch {
+    return [];
+  }
+}
+
+async function writeCustomListings(appId: number, listings: CustomListing[]) {
+  const key = customListingsKey(appId);
+  if (listings.length === 0) {
+    await supabase.from('settings').delete().eq('key', key);
+    return;
+  }
+  await supabase
+    .from('settings')
+    .upsert({ key, value: JSON.stringify(listings) }, { onConflict: 'key' });
+}
+
+async function saveCustomListings(appId: number, formData: FormData) {
+  if (!formData.has('customListings')) return; // caller opted out entirely
+
+  let metas: CustomListingMeta[] = [];
+  try {
+    const parsed = JSON.parse((formData.get('customListings') as string) || '[]');
+    if (Array.isArray(parsed)) metas = parsed;
+  } catch {
+    metas = [];
+  }
+
+  const previous = await readCustomListings(appId);
+
+  const final: CustomListing[] = metas.map((meta, i) => {
+    const newIcon = ((formData.get(`custom_${i}_icon`) as string) || '').trim();
+    const icon_path = newIcon || (meta.icon || '');
+
+    const keptShots = Array.isArray(meta.keptScreenshots)
+      ? meta.keptScreenshots.filter((s) => typeof s === 'string')
+      : [];
+    const newShots = (formData.getAll(`custom_${i}_shots`) as any[])
+      .filter((s) => typeof s === 'string' && s.trim())
+      .map((s) => s.trim());
+    const screenshots = [...keptShots, ...newShots].slice(0, 8);
+
+    return {
+      id: i + 1,
+      name: (meta.name || '').trim(),
+      short_description: (meta.short_description || '').trim(),
+      long_description: (meta.long_description || '').trim(),
+      icon_path,
+      screenshots,
+    };
+  });
+
+  // Best-effort: delete storage files from the previous version that the new
+  // version no longer references.
+  const stillUsed = new Set<string>();
+  for (const l of final) {
+    if (l.icon_path) stillUsed.add(l.icon_path);
+    for (const s of l.screenshots) stillUsed.add(s);
+  }
+  for (const l of previous) {
+    if (l.icon_path && !stillUsed.has(l.icon_path)) await deleteFile(l.icon_path);
+    for (const s of l.screenshots) if (!stillUsed.has(s)) await deleteFile(s);
+  }
+
+  await writeCustomListings(appId, final);
+}
+
 export async function addApp(
   formData: FormData,
 ): Promise<ActionResponse<{ id: number }>> {
@@ -511,6 +675,8 @@ export async function addApp(
         await supabase.from('app_screenshots').insert({ app_id: appId, file_path: screenshotPath });
       }
     }
+
+    await saveCustomListings(appId, formData);
 
     await snapshotListing(appId, aabPath || undefined);
 
@@ -832,6 +998,8 @@ export async function getAppById(id: number) {
 
   if (error || !app) return null;
 
+  const customListings = await readCustomListings(id);
+
   return {
     ...app,
     account_email: app.accounts?.email,
@@ -841,6 +1009,7 @@ export async function getAppById(id: number) {
     account_website: app.accounts?.website,
     account_phone: app.accounts?.phone,
     screenshots: app.app_screenshots || [],
+    custom_listings: customListings,
     accounts: undefined,
     app_screenshots: undefined,
   };
@@ -1062,6 +1231,14 @@ export async function deleteApp(id: number) {
       for (const s of screenshots || []) await deleteFile(s.file_path);
     }
 
+    // Clean up custom listings (files + settings blob).
+    const customListings = await readCustomListings(id);
+    for (const l of customListings) {
+      await deleteFile(l.icon_path);
+      for (const s of l.screenshots) await deleteFile(s);
+    }
+    await writeCustomListings(id, []);
+
     await supabase.from('apps').delete().eq('id', id);
     revalidatePath('/apps');
     revalidatePath('/');
@@ -1122,7 +1299,11 @@ export async function updateApp(id: number, formData: FormData) {
       }
     }
 
-    await snapshotListing(id);
+    await saveCustomListings(id, formData);
+
+    // Editing the original app updates the current listing snapshot in place —
+    // it is NOT a new version. New listing versions only come from publishing.
+    await updateCurrentListingSnapshot(id);
 
     revalidatePath('/apps');
     revalidatePath(`/apps/${id}`);

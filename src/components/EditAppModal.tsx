@@ -2,19 +2,27 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { X, Smartphone, Globe, Save, AlignLeft, Sparkles, Loader2, ChevronLeft, Image as ImageIcon, FileImage, Plus, Check, Trash2, Package, Link as LinkIcon, Upload, AlertCircle } from 'lucide-react';
+import { X, Smartphone, Globe, Save, AlignLeft, Sparkles, Loader2, ChevronLeft, Image as ImageIcon, FileImage, Plus, Check, Trash2, Package, Link as LinkIcon, Upload, AlertCircle, Copy } from 'lucide-react';
 import { updateApp, generateAppDescriptions, deleteScreenshot } from '@/lib/actions';
 import { uploadFilesInForm } from '@/lib/upload-client';
 import { resizeImageToFile } from '@/lib/resize-image';
 import ModalPortal from './ModalPortal';
 import { APP_CATEGORIES, buildPlayStoreUrl } from './CreateAppModal';
+import CustomListingsEditor, {
+  CustomListingDraft,
+  customListingsToDrafts,
+  appendCustomListingsToForm,
+  customListingUploadBuckets,
+} from './CustomListingsEditor';
 
-export default function EditAppModal({ app }: { app: any }) {
+type EditTab = 'content' | 'assets' | 'custom';
+
+export default function EditAppModal({ app, triggerLabel, initialTab }: { app: any; triggerLabel?: string; initialTab?: EditTab }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [activeTab, setActiveTab] = useState<'content' | 'assets'>('content');
+  const [activeTab, setActiveTab] = useState<EditTab>(initialTab || 'content');
   const [aiPrompt, setAiPrompt] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -43,6 +51,11 @@ export default function EditAppModal({ app }: { app: any }) {
   const [newScreenshotPreviews, setNewScreenshotPreviews] = useState<string[]>([]);
   const [newScreenshotFiles, setNewScreenshotFiles] = useState<File[]>([]);
 
+  // Custom store listings (alternative name/desc/icon/screenshots).
+  const [customListings, setCustomListings] = useState<CustomListingDraft[]>(
+    () => customListingsToDrafts(app.custom_listings || []),
+  );
+
   // Sync state when app prop changes (crucial for refresh after save).
   // Only re-sync while the modal is closed — otherwise opening the modal,
   // typing, and triggering an unrelated parent refresh would wipe edits.
@@ -66,6 +79,7 @@ export default function EditAppModal({ app }: { app: any }) {
     setExistingScreenshots(app.screenshots || []);
     setNewScreenshotFiles([]);
     setNewScreenshotPreviews([]);
+    setCustomListings(customListingsToDrafts(app.custom_listings || []));
   }, [app, isOpen]);
 
   // Auto-derive store URL from package name unless the user has edited it.
@@ -108,6 +122,10 @@ export default function EditAppModal({ app }: { app: any }) {
       formData.append(`screenshot_${index}`, file);
     });
 
+    // Append custom store listings (text meta + their files). Always sent so
+    // the server reconciles removals too.
+    appendCustomListingsToForm(formData, customListings);
+
     try {
       await uploadFilesInForm(formData, {
         iconSmall: { bucket: 'icons', prefix: 'small-' },
@@ -120,6 +138,7 @@ export default function EditAppModal({ app }: { app: any }) {
         screenshot_5: { bucket: 'screenshots', prefix: 'shot-5-' },
         screenshot_6: { bucket: 'screenshots', prefix: 'shot-6-' },
         screenshot_7: { bucket: 'screenshots', prefix: 'shot-7-' },
+        ...customListingUploadBuckets(customListings.length),
       });
     } catch (err: any) {
       setIsPending(false);
@@ -216,8 +235,16 @@ export default function EditAppModal({ app }: { app: any }) {
 
   return (
     <>
-      <button onClick={() => setIsOpen(true)} className="btn btn-secondary small" style={{ width: '40px', padding: 0, justifyContent: 'center' }}>
+      <button
+        onClick={() => { setActiveTab(initialTab || 'content'); setIsOpen(true); }}
+        className="btn btn-secondary small"
+        style={triggerLabel
+          ? { display: 'inline-flex', alignItems: 'center', gap: 6 }
+          : { width: '40px', padding: 0, justifyContent: 'center' }}
+        title={triggerLabel || 'Edit listing'}
+      >
         <Smartphone size={16} />
+        {triggerLabel && <span>{triggerLabel}</span>}
       </button>
 
       <ModalPortal open={isOpen}>
@@ -248,16 +275,24 @@ export default function EditAppModal({ app }: { app: any }) {
                 >
                   <AlignLeft size={18} /> Content Studio
                 </button>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   className={`tab-btn ${activeTab === 'assets' ? 'active' : ''}`}
                   onClick={() => setActiveTab('assets')}
                 >
                   <ImageIcon size={18} /> Visual Assets
                 </button>
+                <button
+                  type="button"
+                  className={`tab-btn ${activeTab === 'custom' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('custom')}
+                >
+                  <Copy size={18} /> CL
+                  {customListings.length > 0 && <span className="tab-count">{customListings.length}</span>}
+                </button>
               </div>
 
-              {activeTab === 'content' ? (
+              {activeTab === 'content' && (
                 <div className="studio-grid anim-fade-in">
                   
                   {/* Left Column: AI & Info */}
@@ -411,7 +446,9 @@ export default function EditAppModal({ app }: { app: any }) {
                   </div>
 
                 </div>
-              ) : (
+              )}
+
+              {activeTab === 'assets' && (
                 <div className="assets-workspace anim-fade-in">
                   <div className="section-title">
                     <ImageIcon size={24} color="var(--accent)" />
@@ -534,13 +571,30 @@ export default function EditAppModal({ app }: { app: any }) {
                   </div>
                 </div>
               )}
+
+              {activeTab === 'custom' && (
+                <div className="anim-fade-in">
+                  <CustomListingsEditor value={customListings} onChange={setCustomListings} />
+                </div>
+              )}
             </form>
 
             <div className="modal-footer sticky-footer">
+              {(shortDesc.length > 80 || longDesc.length > 4000) && (
+                <div className="asset-error-msg" style={{ marginRight: 'auto' }}>
+                  <AlertCircle size={14} />
+                  <span>
+                    {longDesc.length > 4000 && `Long description is ${longDesc.length.toLocaleString()} / 4,000`}
+                    {longDesc.length > 4000 && shortDesc.length > 80 && ' · '}
+                    {shortDesc.length > 80 && `Short description is ${shortDesc.length} / 80`}
+                    {' '}— over Google Play's limit. You can still save, but trim it on the Content Studio tab before uploading.
+                  </span>
+                </div>
+              )}
               <button type="button" className="btn btn-secondary" onClick={() => setIsOpen(false)}>
                 <ChevronLeft size={18} /> Cancel
               </button>
-              <button type="submit" className="btn btn-accent btn-glow" disabled={isPending || shortDesc.length > 80 || longDesc.length > 4000} onClick={() => {
+              <button type="submit" className="btn btn-accent btn-glow" disabled={isPending} onClick={() => {
                 if (formRef.current) formRef.current.requestSubmit();
               }}>
                 <Save size={18} style={{ marginRight: '8px' }} />

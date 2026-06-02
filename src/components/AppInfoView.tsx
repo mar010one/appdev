@@ -7,11 +7,12 @@ import {
   Mail, Globe, ShieldCheck, ExternalLink, Hash,
   Sparkles, FileImage, ImageIcon as Image, ImagesIcon,
   PartyPopper, Share2, Link2, History, RefreshCw, FileDown,
-  Package, Tag,
+  Package, Tag, Layers,
 } from 'lucide-react';
 import AppStatusMenu, { statusIcon, statusLabel } from './AppStatusMenu';
 import ListingVersionModal from './ListingVersionModal';
 import AppShareLinkButton from './AppShareLinkButton';
+import { getAppShareIndex } from '@/lib/actions';
 
 type App = {
   id: number;
@@ -37,6 +38,16 @@ type App = {
   account_type?: string;
   screenshots?: Array<{ id: number; file_path: string }>;
   share_active?: boolean;
+  custom_listings?: CustomListing[];
+};
+
+type CustomListing = {
+  id: number;
+  name?: string;
+  short_description?: string;
+  long_description?: string;
+  icon_path?: string;
+  screenshots?: string[];
 };
 
 type ListingVersion = {
@@ -235,6 +246,20 @@ export default function AppInfoView({
   const [linkCopied, setLinkCopied] = useState(false);
   const [shareUrl, setShareUrl] = useState<string>('');
 
+  // Listing switcher: 0 = main listing, 1..n = custom listing index.
+  const customListings = app.custom_listings || [];
+  const [activeListing, setActiveListing] = useState(0);
+  const active = activeListing > 0 ? customListings[activeListing - 1] : null;
+
+  // The currently-displayed listing content (main or the selected custom one).
+  const viewName = active ? (active.name || app.name) : app.name;
+  const viewShort = active ? (active.short_description || '') : app.short_description;
+  const viewLong = active ? (active.long_description || '') : app.long_description;
+  const viewIcon = active ? (active.icon_path || app.icon_small_path) : app.icon_small_path;
+  const viewScreenshots: Array<{ id: number; file_path: string }> = active
+    ? (active.screenshots || []).map((url, i) => ({ id: i, file_path: url }))
+    : (app.screenshots || []);
+
   const versionsNewestFirst = listingVersions;
 
   // Latest listing version that has an AAB/IPA attached
@@ -254,10 +279,18 @@ export default function AppInfoView({
   }, [versionsNewestFirst]);
 
   // Build the absolute share URL on the client so it works behind any host.
+  // The public route resolves `/a<n>` by *share index* (1-based position), not
+  // the raw DB id — so the URL must use the index too, or it 404s / opens the
+  // wrong app. Mirror what AppShareLinkButton does.
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setShareUrl(`${window.location.origin}/a${app.id}`);
-    }
+    if (typeof window === 'undefined') return;
+    let cancelled = false;
+    (async () => {
+      const idx = await getAppShareIndex(app.id);
+      if (cancelled) return;
+      setShareUrl(`${window.location.origin}/a${idx ?? app.id}`);
+    })();
+    return () => { cancelled = true; };
   }, [app.id]);
 
   async function copyShareLink() {
@@ -270,13 +303,13 @@ export default function AppInfoView({
   }
 
   const lines: string[] = [
-    `App Name: ${app.name || ''}`,
+    `App Name: ${viewName || ''}`,
     `Package Name: ${app.package_name || ''}`,
     `Category: ${app.category || ''}`,
-    `Short Description: ${app.short_description || ''}`,
+    `Short Description: ${viewShort || ''}`,
     '',
     'Long Description:',
-    `${app.long_description || ''}`,
+    `${viewLong || ''}`,
     '',
     `Developer: ${app.account_developer_name || ''}`,
     `Developer ID: ${app.account_developer_id || ''}`,
@@ -295,7 +328,7 @@ export default function AppInfoView({
     }
   }
 
-  const screenshots = app.screenshots || [];
+  const screenshots = viewScreenshots;
 
   const isShare = variant === 'share';
 
@@ -311,20 +344,22 @@ export default function AppInfoView({
       {/* Hero */}
       <header className="info-hero glass-card">
         <div className="info-hero-left">
-          {app.icon_small_path ? (
-            <img src={app.icon_small_path} alt={app.name} className="info-hero-icon" />
+          {viewIcon ? (
+            <img src={viewIcon} alt={viewName} className="info-hero-icon" />
           ) : (
             <div className="info-hero-icon placeholder"><Smartphone size={36} /></div>
           )}
           <div>
             <div className="info-eyebrow">
-              <Sparkles size={12} />
-              {isShare ? 'STORE LISTING PACKAGE' : 'APP REGISTERED'}
-              {!isShare && <PartyPopper size={12} style={{ marginLeft: 6 }} />}
+              {active ? <Layers size={12} /> : <Sparkles size={12} />}
+              {active
+                ? `CL ${activeListing}`
+                : (isShare ? 'STORE LISTING PACKAGE' : 'APP REGISTERED')}
+              {!isShare && !active && <PartyPopper size={12} style={{ marginLeft: 6 }} />}
             </div>
-            <h1 className="info-title">{app.name}</h1>
+            <h1 className="info-title">{viewName}</h1>
             <p className="text-muted info-sub">
-              {app.short_description || 'No tagline'}
+              {viewShort || 'No tagline'}
             </p>
             <div className="info-hero-meta">
               {isShare ? (
@@ -377,6 +412,39 @@ export default function AppInfoView({
           )}
         </div>
       </header>
+
+      {/* Listing switcher — appears when the app has custom store listings */}
+      {customListings.length > 0 && (
+        <div className="listing-switcher glass-card">
+          <div className="listing-switcher-label">
+            <Layers size={16} />
+            <span>Store listing</span>
+          </div>
+          <div className="listing-switcher-tabs">
+            <button
+              type="button"
+              className={`listing-switch-tab ${activeListing === 0 ? 'active' : ''}`}
+              onClick={() => setActiveListing(0)}
+            >
+              <Sparkles size={14} />
+              Main listing
+            </button>
+            {customListings.map((cl, i) => (
+              <button
+                key={cl.id}
+                type="button"
+                className={`listing-switch-tab ${activeListing === i + 1 ? 'active' : ''}`}
+                onClick={() => setActiveListing(i + 1)}
+              >
+                {cl.icon_path
+                  ? <img src={cl.icon_path} alt="" className="listing-switch-icon" />
+                  : <Copy size={14} />}
+                {cl.name?.trim() || `CL ${i + 1}`}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Share-link banner — only shown on the owner view */}
       {!isShare && shareUrl && (
@@ -512,7 +580,7 @@ export default function AppInfoView({
             <span className="text-muted">Click any field to copy</span>
           </div>
 
-          <CopyableField label="App Name" value={app.name} icon={<Smartphone size={14} />} />
+          <CopyableField label="App Name" value={viewName} icon={<Smartphone size={14} />} />
           <CopyableField
             label="Package Name"
             value={app.package_name}
@@ -520,8 +588,8 @@ export default function AppInfoView({
             href={app.package_name ? `https://play.google.com/store/apps/details?id=${app.package_name}` : undefined}
           />
           <CopyableField label="Category" value={app.category} icon={<Tag size={14} />} />
-          <CopyableField label="Short Description" value={app.short_description} icon={<Sparkles size={14} />} />
-          <CopyableField label="Long Description" value={app.long_description} multiline icon={<Sparkles size={14} />} />
+          <CopyableField label="Short Description" value={viewShort} icon={<Sparkles size={14} />} />
+          <CopyableField label="Long Description" value={viewLong} multiline icon={<Sparkles size={14} />} />
 
           <div className="info-section-head" style={{ marginTop: 28 }}>
             <h2>Developer & Contact</h2>
@@ -573,7 +641,7 @@ export default function AppInfoView({
           </div>
 
           <div className="image-assets-grid">
-            <ImageAsset label="Store Icon" src={app.icon_small_path} hint="512x512" />
+            <ImageAsset label={active ? 'CL Icon' : 'Store Icon'} src={viewIcon} hint="512x512" />
             <ImageAsset label="Promo Graphic" src={app.icon_large_path} hint="1024x500" />
           </div>
 

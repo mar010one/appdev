@@ -7532,3 +7532,309 @@ html, body {
   .income-network-amount { font-size: 1.35rem; }
 }
 
+
+/* ============================================================
+   Custom Store Listings — editor + public listing switcher
+   ============================================================ */
+
+.cl-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.cl-editor-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.cl-count-badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-glow);
+}
+
+/* Empty-state big "add" button */
+.cl-empty-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 38px 24px;
+  border-radius: 20px;
+  border: 1.5px dashed var(--card-border);
+  background: var(--glass);
+  color: var(--foreground);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.25s, background 0.25s, transform 0.2s;
+}
+.cl-empty-add:hover {
+  border-color: var(--accent);
+  background: var(--glass-hover);
+  transform: translateY(-2px);
+}
+.cl-empty-add strong { font-size: 1.05rem; }
+.cl-empty-add small { color: var(--muted); }
+.cl-empty-add-icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  margin-bottom: 6px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-glow);
+}
+
+/* Per-listing card */
+.cl-card {
+  border-radius: 20px;
+  border: 1px solid var(--card-border);
+  background: linear-gradient(160deg, rgba(255,255,255,0.035), rgba(255,255,255,0.01));
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  position: relative;
+  overflow: hidden;
+}
+.cl-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), transparent 70%);
+  opacity: 0.7;
+}
+
+.cl-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cl-card-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.cl-remove-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.08);
+  border: 1px solid rgba(248, 113, 113, 0.25);
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+}
+.cl-remove-btn:hover { background: rgba(248, 113, 113, 0.16); transform: translateY(-1px); }
+
+.cl-card-grid {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+.cl-icon-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cl-text-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cl-field-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.cl-icon-drop {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  border-radius: 18px;
+  border: 1.5px dashed var(--card-border);
+  background: var(--glass);
+  overflow: hidden;
+  transition: border-color 0.25s, background 0.25s;
+}
+.cl-icon-drop:hover { border-color: var(--accent); background: var(--glass-hover); }
+.cl-icon-drop.has-img { border-style: solid; }
+.cl-icon-drop img { width: 100%; height: 100%; object-fit: cover; }
+.cl-icon-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  text-align: center;
+  padding: 10px;
+}
+.cl-icon-empty span { font-size: 0.85rem; font-weight: 600; color: var(--foreground); }
+.cl-icon-empty small { font-size: 0.72rem; }
+.cl-icon-clear {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  color: var(--muted);
+  background: var(--glass);
+  border: 1px solid var(--card-border);
+  cursor: pointer;
+}
+.cl-icon-clear:hover { color: var(--foreground); border-color: var(--accent); }
+
+/* Screenshots */
+.cl-shots-block { display: flex; flex-direction: column; gap: 10px; }
+.cl-shots-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.cl-shots-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 12px;
+}
+.cl-shot-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  aspect-ratio: 9 / 16;
+  max-height: 190px;
+  border-radius: 14px;
+  border: 1.5px dashed var(--card-border);
+  background: var(--glass);
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color 0.25s, color 0.25s, background 0.25s;
+}
+.cl-shot-add:hover { border-color: var(--accent); color: var(--accent); background: var(--glass-hover); }
+.cl-shot-add small { font-size: 0.78rem; font-weight: 600; }
+
+.cl-add-more {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 18px;
+  border-radius: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-glow);
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+}
+.cl-add-more:hover { background: var(--accent-glow); transform: translateY(-1px); }
+
+/* Edit-modal tab count chip */
+.tab-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  margin-left: 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--background);
+  background: var(--accent);
+}
+
+/* ---- Public/owner listing switcher ---- */
+.listing-switcher {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+}
+.listing-switcher-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.listing-switcher-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.listing-switch-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--glass);
+  border: 1px solid var(--card-border);
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s, border-color 0.2s, transform 0.2s;
+}
+.listing-switch-tab:hover { color: var(--foreground); border-color: var(--accent); transform: translateY(-1px); }
+.listing-switch-tab.active {
+  color: var(--background);
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 6px 18px var(--accent-glow);
+}
+.listing-switch-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+@media (max-width: 720px) {
+  .cl-card-grid { grid-template-columns: 1fr; }
+  .cl-icon-col { max-width: 200px; }
+}
