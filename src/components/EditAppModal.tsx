@@ -236,16 +236,20 @@ export default function EditAppModal({ app, triggerLabel, initialTab }: { app: a
   return (
     <>
       <button
-        onClick={async () => {
+        onClick={() => {
           setActiveTab(initialTab || 'content');
           setIsOpen(true);
-          // Pull the latest custom listings from the server so the CL tab is
-          // always in sync with the public/info view (the `app` prop can be a
-          // stale client-router cache).
-          try {
-            const fresh = await getCustomListings(app.id);
-            setCustomListings(customListingsToDrafts(fresh));
-          } catch {}
+          // The page is force-dynamic, so the `app` prop already carries the
+          // latest CLs and the editor shows them instantly. Only fall back to a
+          // server fetch if the prop somehow has none (stale client cache), and
+          // only apply it when it actually finds CLs — never wipe what's shown.
+          if (!(app.custom_listings && app.custom_listings.length)) {
+            getCustomListings(app.id)
+              .then((fresh) => {
+                if (fresh.length) setCustomListings(customListingsToDrafts(fresh));
+              })
+              .catch(() => {});
+          }
         }}
         className="btn btn-secondary small"
         style={triggerLabel
