@@ -567,6 +567,12 @@ async function writeCustomListings(appId: number, listings: CustomListing[]) {
     .upsert({ key, value: JSON.stringify(listings) }, { onConflict: 'key' });
 }
 
+// Fetch the latest saved custom listings for an app. Used by the edit modal so
+// it always shows current data (its `app` prop can be a stale client cache).
+export async function getCustomListings(appId: number): Promise<CustomListing[]> {
+  return readCustomListings(appId);
+}
+
 async function saveCustomListings(appId: number, formData: FormData) {
   if (!formData.has('customListings')) return; // caller opted out entirely
 

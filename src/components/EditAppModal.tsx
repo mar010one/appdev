@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { X, Smartphone, Globe, Save, AlignLeft, Sparkles, Loader2, ChevronLeft, Image as ImageIcon, FileImage, Plus, Check, Trash2, Package, Link as LinkIcon, Upload, AlertCircle, Copy } from 'lucide-react';
-import { updateApp, generateAppDescriptions, deleteScreenshot } from '@/lib/actions';
+import { updateApp, generateAppDescriptions, deleteScreenshot, getCustomListings } from '@/lib/actions';
 import { uploadFilesInForm } from '@/lib/upload-client';
 import { resizeImageToFile } from '@/lib/resize-image';
 import ModalPortal from './ModalPortal';
@@ -236,7 +236,17 @@ export default function EditAppModal({ app, triggerLabel, initialTab }: { app: a
   return (
     <>
       <button
-        onClick={() => { setActiveTab(initialTab || 'content'); setIsOpen(true); }}
+        onClick={async () => {
+          setActiveTab(initialTab || 'content');
+          setIsOpen(true);
+          // Pull the latest custom listings from the server so the CL tab is
+          // always in sync with the public/info view (the `app` prop can be a
+          // stale client-router cache).
+          try {
+            const fresh = await getCustomListings(app.id);
+            setCustomListings(customListingsToDrafts(fresh));
+          } catch {}
+        }}
         className="btn btn-secondary small"
         style={triggerLabel
           ? { display: 'inline-flex', alignItems: 'center', gap: 6 }
