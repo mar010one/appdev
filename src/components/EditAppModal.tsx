@@ -82,6 +82,22 @@ export default function EditAppModal({ app, triggerLabel, initialTab }: { app: a
     setCustomListings(customListingsToDrafts(app.custom_listings || []));
   }, [app, isOpen]);
 
+  // Background prefetch: if the `app` prop arrived without custom listings
+  // (stale client cache / older render), pull them once on mount so the CL tab
+  // is already populated by the time the user opens the modal — opening stays
+  // instant with no round-trip. Never clobbers data already present/edited.
+  useEffect(() => {
+    if (app.custom_listings && app.custom_listings.length) return;
+    let cancelled = false;
+    getCustomListings(app.id)
+      .then((fresh) => {
+        if (cancelled || !fresh.length) return;
+        setCustomListings((prev) => (prev.length ? prev : customListingsToDrafts(fresh)));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [app.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Auto-derive store URL from package name unless the user has edited it.
   useEffect(() => {
     if (storeUrlTouched) return;
@@ -236,21 +252,7 @@ export default function EditAppModal({ app, triggerLabel, initialTab }: { app: a
   return (
     <>
       <button
-        onClick={() => {
-          setActiveTab(initialTab || 'content');
-          setIsOpen(true);
-          // The page is force-dynamic, so the `app` prop already carries the
-          // latest CLs and the editor shows them instantly. Only fall back to a
-          // server fetch if the prop somehow has none (stale client cache), and
-          // only apply it when it actually finds CLs — never wipe what's shown.
-          if (!(app.custom_listings && app.custom_listings.length)) {
-            getCustomListings(app.id)
-              .then((fresh) => {
-                if (fresh.length) setCustomListings(customListingsToDrafts(fresh));
-              })
-              .catch(() => {});
-          }
-        }}
+        onClick={() => { setActiveTab(initialTab || 'content'); setIsOpen(true); }}
         className="btn btn-secondary small"
         style={triggerLabel
           ? { display: 'inline-flex', alignItems: 'center', gap: 6 }
