@@ -7,7 +7,7 @@ import {
   Mail, Globe, ShieldCheck, ExternalLink, Hash,
   Sparkles, FileImage, ImageIcon as Image, ImagesIcon,
   PartyPopper, Share2, Link2, History, RefreshCw, FileDown,
-  Package, Tag, Layers,
+  Package, Tag, Layers, Loader2,
 } from 'lucide-react';
 import AppStatusMenu, { statusIcon, statusLabel } from './AppStatusMenu';
 import ListingVersionModal from './ListingVersionModal';
@@ -245,6 +245,8 @@ export default function AppInfoView({
   const [bundleCopied, setBundleCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [shareUrl, setShareUrl] = useState<string>('');
+  const [downloading, setDownloading] = useState(false);
+  const [dlProgress, setDlProgress] = useState<{ done: number; total: number } | null>(null);
 
   // Listing switcher: 0 = main listing, 1..n = custom listing index.
   const customListings = app.custom_listings || [];
@@ -328,6 +330,42 @@ export default function AppInfoView({
     }
   }
 
+  // One-click grab: save every asset (icon, promo, screenshots, AAB) as its own
+  // normal file download, one after another.
+  async function downloadAll() {
+    if (downloading) return;
+    setDownloading(true);
+
+    const safeName = (viewName || 'app').replace(/[^a-z0-9_-]+/gi, '_').replace(/^_+|_+$/g, '') || 'app';
+    const assets: Array<{ url: string; name: string }> = [];
+    if (viewIcon) assets.push({ url: viewIcon, name: `${safeName}-icon-${fileNameFromPath(viewIcon)}` });
+    if (app.icon_large_path) assets.push({ url: app.icon_large_path, name: `${safeName}-promo-${fileNameFromPath(app.icon_large_path)}` });
+    viewScreenshots.forEach((shot, i) => {
+      const n = String(i + 1).padStart(2, '0');
+      assets.push({ url: shot.file_path, name: `${safeName}-screenshot-${n}-${fileNameFromPath(shot.file_path)}` });
+    });
+    if (latestAab?.release_file_path) {
+      assets.push({ url: latestAab.release_file_path, name: fileNameFromPath(latestAab.release_file_path) });
+    }
+
+    setDlProgress({ done: 0, total: assets.length });
+
+    try {
+      // Download sequentially with a small gap so the browser doesn't drop
+      // back-to-back downloads.
+      for (let i = 0; i < assets.length; i++) {
+        await downloadFile(assets[i].url, assets[i].name);
+        setDlProgress({ done: i + 1, total: assets.length });
+        if (i < assets.length - 1) {
+          await new Promise(r => setTimeout(r, 400));
+        }
+      }
+    } finally {
+      setDownloading(false);
+      setDlProgress(null);
+    }
+  }
+
   const screenshots = viewScreenshots;
 
   const isShare = variant === 'share';
@@ -391,7 +429,20 @@ export default function AppInfoView({
         <div className="info-hero-actions">
           <button
             type="button"
-            className={`btn btn-primary ${bundleCopied ? 'success' : ''}`}
+            className="btn btn-primary"
+            onClick={downloadAll}
+            disabled={downloading}
+          >
+            {downloading
+              ? <Loader2 size={18} className="spin" />
+              : <Download size={18} />}
+            {downloading
+              ? (dlProgress ? `Downloading ${dlProgress.done}/${dlProgress.total}…` : 'Downloading…')
+              : 'Download all'}
+          </button>
+          <button
+            type="button"
+            className={`btn btn-secondary ${bundleCopied ? 'success' : ''}`}
             onClick={copyAll}
           >
             {bundleCopied ? <Check size={18} /> : <Copy size={18} />}
