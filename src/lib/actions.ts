@@ -1266,17 +1266,22 @@ export async function updateApp(id: number, formData: FormData) {
     const store_url = explicitStoreUrl
       ? explicitStoreUrl
       : (package_name ? `https://play.google.com/store/apps/details?id=${package_name}` : '');
-    const contact_email = (formData.get('contactEmail') as string) || '';
-    const privacy_url = (formData.get('privacyUrl') as string) || '';
-    const website_url = (formData.get('websiteUrl') as string) || '';
-
     const updates: Record<string, any> = {
       name,
       package_name: package_name || null,
       category: category || null,
       short_description, long_description,
-      store_url, contact_email, privacy_url, website_url,
+      store_url,
     };
+
+    // Contact email, privacy URL, and website are NOT part of the edit-listing
+    // form. Only overwrite them when the form actually carries the field —
+    // otherwise a plain content edit would blank out values set at creation
+    // (privacy URL has no account-level fallback on the share page, so it would
+    // simply disappear from the shared listing).
+    if (formData.has('contactEmail')) updates.contact_email = (formData.get('contactEmail') as string) || '';
+    if (formData.has('privacyUrl')) updates.privacy_url = (formData.get('privacyUrl') as string) || '';
+    if (formData.has('websiteUrl')) updates.website_url = (formData.get('websiteUrl') as string) || '';
 
     const iconSmallPath = await saveUploadedFile(formData.get('iconSmall'), 'icons', 'small-');
     if (iconSmallPath) updates.icon_small_path = iconSmallPath;

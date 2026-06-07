@@ -43,3 +43,6 @@ next-env.d.ts
 # local data
 database.sqlite
 /public/uploads/
+
+# claude code local settings (may contain secrets/tokens)
+.claude/settings.local.json

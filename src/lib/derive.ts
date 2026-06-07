@@ -9,11 +9,11 @@ export function deriveDefaultPrivacyUrl(website?: string | null): string {
   if (!website) return '';
   try {
     const u = new URL(website);
-    // Host root + /privacy.html
-    return `${u.protocol}//${u.host}/privacy.html`;
+    // Host root + /privacy
+    return `${u.protocol}//${u.host}/privacy`;
   } catch {
     // Fallback: append the path if the user typed a bare domain
     const trimmed = website.replace(/\/+$/, '');
-    return `${trimmed}/privacy.html`;
+    return `${trimmed}/privacy`;
   }
 }

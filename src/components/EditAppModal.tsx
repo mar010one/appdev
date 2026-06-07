@@ -37,6 +37,7 @@ export default function EditAppModal({ app, triggerLabel, initialTab }: { app: a
   const [category, setCategory] = useState(app.category || '');
   const [storeUrl, setStoreUrl] = useState(app.store_url || '');
   const [storeUrlTouched, setStoreUrlTouched] = useState(false);
+  const [privacyUrl, setPrivacyUrl] = useState(app.privacy_url || '');
 
   // Visual Assets State
   const [iconPreview, setIconPreview] = useState<string | null>(app.icon_small_path || null);
@@ -68,6 +69,7 @@ export default function EditAppModal({ app, triggerLabel, initialTab }: { app: a
     setCategory(app.category || '');
     setStoreUrl(app.store_url || '');
     setStoreUrlTouched(false);
+    setPrivacyUrl(app.privacy_url || '');
     setIconPreview(app.icon_small_path || null);
     setPromoPreview(app.icon_large_path || null);
     setIconFile(null);
@@ -122,6 +124,7 @@ export default function EditAppModal({ app, triggerLabel, initialTab }: { app: a
     formData.set('packageName', packageName);
     formData.set('category', category);
     formData.set('storeUrl', storeUrl);
+    formData.set('privacyUrl', privacyUrl);
 
     // Override the native <input name="iconSmall|iconLarge"> values with the
     // resized File objects. The native inputs still hold the user's original
@@ -408,6 +411,19 @@ export default function EditAppModal({ app, triggerLabel, initialTab }: { app: a
                             placeholder="Auto-generated from package name"
                             value={storeUrl}
                             onChange={(e) => { setStoreUrl(e.target.value); setStoreUrlTouched(true); }}
+                          />
+                        </div>
+                      </div>
+                      <div className="input-field">
+                        <label>Privacy Policy URL</label>
+                        <div className="input-with-icon-large">
+                          <Globe size={20} />
+                          <input
+                            type="url"
+                            name="privacyUrl"
+                            placeholder="https://yourcompany.com/privacy"
+                            value={privacyUrl}
+                            onChange={(e) => setPrivacyUrl(e.target.value)}
                           />
                         </div>
                       </div>

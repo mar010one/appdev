@@ -65,6 +65,30 @@ function getMissing(co: Company): string[] {
   return m;
 }
 
+// A company is "used" once it is tied to a Google Play account (or explicitly flagged used).
+function isUsed(co: Company): boolean {
+  return !!co.linked_account_id || co.status === 'used';
+}
+
+// "Ready to open a Google Play / App Store account": has the core conditions —
+// ICE, DUNS, ID Front, ID Back and a Company document. (DED / linked account not required.)
+function isReady(co: Company): boolean {
+  const docs = co.documents ?? [];
+  return (
+    !!co.ice &&
+    !!co.duns &&
+    docs.some((d) => d.doc_type === 'id_front') &&
+    docs.some((d) => d.doc_type === 'id_back') &&
+    docs.some((d) => d.doc_type === 'company_doc')
+  );
+}
+
+// Ready AND still available — these are the companies you can actually use to open a
+// new account. A company that already has its DUNS in use is not counted here.
+function isReadyAvailable(co: Company): boolean {
+  return isReady(co) && !isUsed(co);
+}
+
 export default function CompaniesView({
   initialCompanies,
   accounts,
@@ -76,13 +100,24 @@ export default function CompaniesView({
   const [search, setSearch] = useState('');
   const [viewCompany, setViewCompany] = useState<Company | null>(null);
 
-  const filtered = initialCompanies.filter(
-    (c) =>
-      c.name?.toLowerCase().includes(search.toLowerCase()) ||
-      c.ice?.toLowerCase().includes(search.toLowerCase()) ||
-      c.duns?.toLowerCase().includes(search.toLowerCase()) ||
-      c.ded?.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filtered = initialCompanies
+    .filter(
+      (c) =>
+        c.name?.toLowerCase().includes(search.toLowerCase()) ||
+        c.ice?.toLowerCase().includes(search.toLowerCase()) ||
+        c.duns?.toLowerCase().includes(search.toLowerCase()) ||
+        c.ded?.toLowerCase().includes(search.toLowerCase()),
+    )
+    // Companies with a linked Google Play developer account are pushed to the top.
+    .sort((a, b) => (b.linked_account_id ? 1 : 0) - (a.linked_account_id ? 1 : 0));
+
+  const totalCount = initialCompanies.length;
+  // Ready AND not yet used — the companies actually available to open a new account.
+  const readyCount = initialCompanies.filter(isReadyAvailable).length;
+  // Companies still missing a DUNS number.
+  const noDunsCount = initialCompanies.filter((c) => !c.duns).length;
+  // Companies already in use (DUNS already tied to an account).
+  const usedCount = initialCompanies.filter(isUsed).length;
 
   async function handleDeleteCompany(id: number, name: string) {
     if (confirm(`Delete company "${name}"? All uploaded documents will be removed.`)) {
@@ -102,6 +137,52 @@ export default function CompaniesView({
 
   return (
     <div>
+      {/* Summary stats */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+          gap: '16px',
+          marginBottom: '24px',
+        }}
+      >
+        <StatCard
+          icon={<Building2 size={18} color="var(--accent)" />}
+          label="Total companies"
+          value={totalCount}
+          tint="rgba(234,179,8,0.12)"
+          border="rgba(234,179,8,0.25)"
+          accent="var(--accent)"
+        />
+        <StatCard
+          icon={<Zap size={18} color="#22c55e" />}
+          label="Ready & available"
+          sublabel="Has DUNS · not used yet"
+          value={readyCount}
+          tint="rgba(34,197,94,0.1)"
+          border="rgba(34,197,94,0.25)"
+          accent="#22c55e"
+        />
+        <StatCard
+          icon={<CheckCircle2 size={18} color="#4285f4" />}
+          label="Already used"
+          sublabel="DUNS tied to an account"
+          value={usedCount}
+          tint="rgba(66,133,244,0.1)"
+          border="rgba(66,133,244,0.25)"
+          accent="#4285f4"
+        />
+        <StatCard
+          icon={<XCircle size={18} color="#ef4444" />}
+          label="No DUNS yet"
+          sublabel="Not ready to open"
+          value={noDunsCount}
+          tint="rgba(239,68,68,0.1)"
+          border="rgba(239,68,68,0.25)"
+          accent="#ef4444"
+        />
+      </div>
+
       {/* Search */}
       <div style={{ position: 'relative', marginBottom: '32px' }}>
         <Search
@@ -157,6 +238,7 @@ export default function CompaniesView({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {filtered.map((co) => {
             const missing = getMissing(co);
+            const ready = isReadyAvailable(co);
             const docs = co.documents ?? [];
             const idFrontDocs  = docs.filter((d) => d.doc_type === 'id_front');
             const idBackDocs   = docs.filter((d) => d.doc_type === 'id_back');
@@ -248,7 +330,33 @@ export default function CompaniesView({
                 </div>
 
                 {/* Completeness */}
-                <div style={{ flex: 0.9 }}>
+                <div style={{ flex: 0.9, display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
+                  {ready && (
+                    <span
+                      title="Has ICE, DUNS, ID Front, ID Back and a Company document, and is not used yet — ready to open a Google Play / App Store account"
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '4px',
+                        padding: '3px 8px', borderRadius: '6px',
+                        background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)',
+                        color: '#22c55e', fontSize: '0.7rem', fontWeight: 700, whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <Zap size={11} /> Ready
+                    </span>
+                  )}
+                  {!co.duns && (
+                    <span
+                      title="No DUNS number yet — cannot open an account"
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '4px',
+                        padding: '3px 8px', borderRadius: '6px',
+                        background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)',
+                        color: '#ef4444', fontSize: '0.7rem', fontWeight: 700, whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <XCircle size={11} /> No DUNS
+                    </span>
+                  )}
                   {missing.length === 0 ? (
                     <span style={{
                       display: 'inline-flex', alignItems: 'center', gap: '4px',
@@ -520,6 +628,47 @@ function CompanyDetailModal({
 }
 
 /* ── Sub-components ── */
+
+function StatCard({
+  icon, label, sublabel, value, tint, border, accent,
+}: {
+  icon: ReactNode; label: string; sublabel?: string; value: number;
+  tint: string; border: string; accent: string;
+}) {
+  return (
+    <div
+      className="premium-card"
+      style={{
+        position: 'relative', overflow: 'hidden',
+        display: 'flex', alignItems: 'center', gap: '14px',
+        padding: '16px 18px', borderRadius: '14px',
+      }}
+    >
+      {/* accent edge */}
+      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px', background: accent, opacity: 0.7 }} />
+      <div
+        style={{
+          width: '42px', height: '42px', borderRadius: '11px', flexShrink: 0,
+          background: tint, border: `1px solid ${border}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        {icon}
+      </div>
+      <div>
+        <div style={{ fontSize: '1.7rem', fontWeight: 800, lineHeight: 1, color: accent }}>{value}</div>
+        <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--foreground)', marginTop: '4px' }}>
+          {label}
+        </div>
+        {sublabel && (
+          <div style={{ fontSize: '0.66rem', fontWeight: 600, color: 'var(--muted)', marginTop: '1px' }}>
+            {sublabel}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function InfoCell({ label, value }: { label: string; value?: string }) {
   return (

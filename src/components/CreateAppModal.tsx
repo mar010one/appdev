@@ -1347,13 +1347,13 @@ export default function CreateAppModal({ accounts }: { accounts: Account[] }) {
                         <input
                           type="url"
                           name="privacyUrl"
-                          placeholder="https://yourcompany.com/privacy.html"
+                          placeholder="https://yourcompany.com/privacy"
                           value={privacyUrl}
                           onChange={(e) => { setPrivacyUrl(e.target.value); setPrivacyTouched(true); }}
                         />
                       </div>
                       <p className="dev-card-hint" style={{ marginTop: 8 }}>
-                        Tip: a default <code>/privacy.html</code> page is bundled with this app and can be hosted at the developer&apos;s domain.
+                        Tip: a default <code>/privacy</code> page is bundled with this app and can be hosted at the developer&apos;s domain.
                       </p>
                     </div>
 
