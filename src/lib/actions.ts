@@ -2724,3 +2724,291 @@ export async function setUserPref(
     return { error: error.message };
   }
 }
+
+// ── Email vault ────────────────────────────────────────────────────────────────
+// A directory of every email address the team owns, with its password, 2FA /
+// authentication info, a free-form note and an optional screenshot. Stored in the
+// dedicated `emails` table (see scripts/apply-emails-migration.mjs).
+//
+// "Used" status is derived, not stored: an email counts as USED when its address
+// matches a developer account's login email (case-insensitive) or it's been
+// explicitly linked to one. Everything else is AVAILABLE (shown green).
+
+export type RawEmailEntry = {
+  id: number;
+  email: string;
+  password: string;
+  auth: string;
+  note: string;
+  image_path: string;
+  phone: string;
+  recovery_email: string;
+  linked_account_id: number | null;
+  linked_company_id: number | null;
+  created_at: string;
+};
+
+async function readEmailVault(): Promise<RawEmailEntry[]> {
+  const { data, error } = await supabase
+    .from('emails')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false });
+  if (error) throw new Error(`getEmails: ${error.message} (code: ${error.code})`);
+  return (data || []).map((e: any) => ({
+    id: e.id,
+    email: e.email || '',
+    password: e.password || '',
+    auth: e.auth || '',
+    note: e.note || '',
+    image_path: e.image_path || '',
+    phone: e.phone || '',
+    recovery_email: e.recovery_email || '',
+    linked_account_id: e.linked_account_id ?? null,
+    linked_company_id: e.linked_company_id ?? null,
+    created_at: e.created_at || '',
+  }));
+}
+
+/** All emails enriched with their derived "used / available" status, the
+ *  developer account + company they're tied to, and that account's apps.
+ *
+ *  Every Client Account is surfaced here automatically (its login email,
+ *  dev password, 2FA secret, security note, company and apps) so the same
+ *  info never has to be typed twice — accounts appear as "synced" entries
+ *  (source: 'account') unless a manual vault entry already covers them. */
+export async function getEmails() {
+  const [rawList, accountsRes, companiesRes, appsRes] = await Promise.all([
+    readEmailVault(),
+    supabase
+      .from('accounts')
+      .select(
+        'id, email, developer_name, developer_id, company_name, type, status, phone, dev_password, dev_2fa_secret, dev_security_notes',
+      ),
+    supabase.from('companies').select('id, name'),
+    supabase.from('apps').select('id, name, account_id'),
+  ]);
+
+  const accounts = accountsRes.data || [];
+  const companies = companiesRes.data || [];
+  const apps = appsRes.data || [];
+
+  const accountsById = new Map<number, any>(accounts.map((a: any) => [a.id, a]));
+  const accountsByEmail = new Map<string, any>();
+  for (const a of accounts) {
+    const key = (a.email || '').trim().toLowerCase();
+    if (key && !accountsByEmail.has(key)) accountsByEmail.set(key, a);
+  }
+  const companiesById = new Map<number, any>(companies.map((c: any) => [c.id, c]));
+  const companiesByName = new Map<string, any>();
+  for (const c of companies) {
+    const key = (c.name || '').trim().toLowerCase();
+    if (key && !companiesByName.has(key)) companiesByName.set(key, c);
+  }
+  const appsByAccount = new Map<number, { id: number; name: string }[]>();
+  for (const ap of apps) {
+    if (ap.account_id == null) continue;
+    const arr = appsByAccount.get(ap.account_id) || [];
+    arr.push({ id: ap.id, name: ap.name || `App #${ap.id}` });
+    appsByAccount.set(ap.account_id, arr);
+  }
+
+  function accountBundle(account: any) {
+    if (!account) return { account: null, apps: [] as { id: number; name: string }[], app_count: 0, company: null as any };
+    const accApps = appsByAccount.get(account.id) || [];
+    let company: any = null;
+    if (account.company_name) {
+      company =
+        companiesByName.get(account.company_name.trim().toLowerCase()) ||
+        { id: 0, name: account.company_name };
+    }
+    return {
+      account: {
+        id: account.id,
+        developer_name: account.developer_name || '',
+        developer_id: account.developer_id || '',
+        email: account.email || '',
+        type: account.type || '',
+        status: account.status || '',
+        company_name: account.company_name || '',
+        phone: account.phone || '',
+      },
+      apps: accApps,
+      app_count: accApps.length,
+      company,
+    };
+  }
+
+  const coveredAccountIds = new Set<number>();
+
+  // 1) Manually-saved vault entries, enriched with their matched account.
+  const manual = rawList.map((e) => {
+    const explicitAccount = e.linked_account_id ? accountsById.get(e.linked_account_id) : null;
+    const matchedAccount = accountsByEmail.get((e.email || '').trim().toLowerCase());
+    const account = explicitAccount || matchedAccount || null;
+    if (account) coveredAccountIds.add(account.id);
+
+    const bundle = accountBundle(account);
+    let company = bundle.company;
+    if (e.linked_company_id) company = companiesById.get(e.linked_company_id) || company;
+
+    return {
+      ...e,
+      source: 'vault' as const,
+      used: !!account,
+      account: bundle.account,
+      app_count: bundle.app_count,
+      apps: bundle.apps,
+      company: company ? { id: company.id, name: company.name } : null,
+    };
+  });
+
+  // 2) Auto-synced entries for every account not already covered above.
+  const derived = accounts
+    .filter((a: any) => (a.email || '').trim() && !coveredAccountIds.has(a.id))
+    .map((a: any) => {
+      const bundle = accountBundle(a);
+      return {
+        id: -a.id, // synthetic — never collides with positive vault ids
+        email: a.email || '',
+        password: a.dev_password || '',
+        auth: a.dev_2fa_secret || '',
+        note: a.dev_security_notes || '',
+        image_path: '',
+        phone: a.phone || '',
+        recovery_email: '',
+        linked_account_id: a.id,
+        linked_company_id: null,
+        created_at: '',
+        source: 'account' as const,
+        used: true,
+        account: bundle.account,
+        app_count: bundle.app_count,
+        apps: bundle.apps,
+        company: bundle.company ? { id: bundle.company.id, name: bundle.company.name } : null,
+      };
+    });
+
+  return [...manual, ...derived];
+}
+
+function emailFormFields(formData: FormData) {
+  const linkedAccountRaw = (formData.get('linkedAccountId') || '').toString().trim();
+  const linkedCompanyRaw = (formData.get('linkedCompanyId') || '').toString().trim();
+  return {
+    email: (formData.get('email') || '').toString().trim(),
+    password: (formData.get('password') || '').toString(),
+    auth: (formData.get('auth') || '').toString(),
+    note: (formData.get('note') || '').toString(),
+    phone: (formData.get('phone') || '').toString().trim(),
+    recovery_email: (formData.get('recoveryEmail') || '').toString().trim(),
+    linked_account_id: linkedAccountRaw ? Number(linkedAccountRaw) : null,
+    linked_company_id: linkedCompanyRaw ? Number(linkedCompanyRaw) : null,
+  };
+}
+
+/** Resolve the image URL from the form: a freshly uploaded URL (the browser
+ *  replaces the File with its public URL), else the kept existing one. */
+function resolveEmailImage(formData: FormData): string {
+  if ((formData.get('removeImage') || '').toString() === '1') return '';
+  // After uploadFilesInForm, a freshly uploaded image arrives as a URL string.
+  // When no file was picked the field is still an empty File — ignore it.
+  const uploaded = formData.get('image');
+  if (typeof uploaded === 'string' && uploaded.trim()) return uploaded.trim();
+  return (formData.get('existingImage') || '').toString().trim();
+}
+
+export async function addEmail(
+  formData: FormData,
+): Promise<ActionResponse<{ id: number }>> {
+  try {
+    const fields = emailFormFields(formData);
+    if (!fields.email) return { error: 'Email address is required.' };
+
+    const { data, error } = await supabase
+      .from('emails')
+      .insert({
+        email: fields.email,
+        password: fields.password,
+        auth: fields.auth,
+        note: fields.note,
+        image_path: resolveEmailImage(formData),
+        phone: fields.phone,
+        recovery_email: fields.recovery_email,
+        linked_account_id: fields.linked_account_id,
+        linked_company_id: fields.linked_company_id,
+      })
+      .select('id')
+      .single();
+    if (error) throw error;
+
+    revalidatePath('/emails');
+    return { success: true, data: { id: data.id } };
+  } catch (error) {
+    console.error('Error in addEmail:', error);
+    return { error: (error as Error).message };
+  }
+}
+
+export async function updateEmail(
+  id: number,
+  formData: FormData,
+): Promise<ActionResponse> {
+  try {
+    const fields = emailFormFields(formData);
+    if (!fields.email) return { error: 'Email address is required.' };
+
+    const { data: previous } = await supabase
+      .from('emails')
+      .select('image_path')
+      .eq('id', id)
+      .maybeSingle();
+    if (!previous) return { error: 'Email not found.' };
+
+    const nextImage = resolveEmailImage(formData);
+    if (previous.image_path && previous.image_path !== nextImage) {
+      await deleteFile(previous.image_path);
+    }
+
+    const { error } = await supabase
+      .from('emails')
+      .update({
+        email: fields.email,
+        password: fields.password,
+        auth: fields.auth,
+        note: fields.note,
+        image_path: nextImage,
+        phone: fields.phone,
+        recovery_email: fields.recovery_email,
+        linked_account_id: fields.linked_account_id,
+        linked_company_id: fields.linked_company_id,
+      })
+      .eq('id', id);
+    if (error) throw error;
+
+    revalidatePath('/emails');
+    return { success: true };
+  } catch (error) {
+    console.error('Error in updateEmail:', error);
+    return { error: (error as Error).message };
+  }
+}
+
+export async function deleteEmail(id: number): Promise<ActionResponse> {
+  try {
+    const { data: entry } = await supabase
+      .from('emails')
+      .select('image_path')
+      .eq('id', id)
+      .maybeSingle();
+    if (entry?.image_path) await deleteFile(entry.image_path);
+    await supabase.from('emails').delete().eq('id', id);
+
+    revalidatePath('/emails');
+    return { success: true };
+  } catch (error) {
+    console.error('Error in deleteEmail:', error);
+    return { error: (error as Error).message };
+  }
+}
+

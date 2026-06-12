@@ -7842,3 +7842,9 @@ html, body {
   .cl-card-grid { grid-template-columns: 1fr; }
   .cl-icon-col { max-width: 200px; }
 }
+
+/* Email Vault — hide the inline security pills on narrow screens so list
+   rows never overflow; the full status is always visible in the detail popup. */
+@media (max-width: 760px) {
+  .email-sec-pills { display: none !important; }
+}

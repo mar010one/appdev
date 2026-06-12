@@ -1,6 +1,6 @@
 'use client';
 
-import { BookOpen, Building2, ChevronsLeft, ChevronsRight, ClipboardList, Globe, Hash, LayoutDashboard, LogOut, Menu, Settings, Smartphone, StickyNote, TrendingUp, Users, Wallet, X } from 'lucide-react';
+import { BookOpen, Building2, ChevronsLeft, ChevronsRight, ClipboardList, Globe, Hash, LayoutDashboard, LogOut, Mail, Menu, Settings, Smartphone, StickyNote, TrendingUp, Users, Wallet, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { ReactNode, useEffect, useState } from 'react';
@@ -156,6 +156,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <Link href="/companies" className={`nav-item ${pathname.startsWith('/companies') ? 'active' : ''}`}>
             <Building2 size={20} />
             <span>Companies</span>
+          </Link>
+          <Link href="/emails" className={`nav-item ${pathname.startsWith('/emails') ? 'active' : ''}`}>
+            <Mail size={20} />
+            <span>Emails</span>
           </Link>
           {user.role === 'admin' && (
             <Link href="/expenses" className={`nav-item ${pathname.startsWith('/expenses') ? 'active' : ''}`}>

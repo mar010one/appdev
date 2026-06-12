@@ -180,6 +180,27 @@ CREATE TABLE IF NOT EXISTS company_documents (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Email Vault: every email the team owns, with password / 2FA / note / image,
+-- optionally linked to a developer account and company.
+CREATE TABLE IF NOT EXISTS emails (
+  id BIGSERIAL PRIMARY KEY,
+  email TEXT NOT NULL,
+  password TEXT,
+  auth TEXT,
+  note TEXT,
+  image_path TEXT,
+  phone TEXT,
+  recovery_email TEXT,
+  linked_account_id BIGINT REFERENCES accounts(id) ON DELETE SET NULL,
+  linked_company_id BIGINT REFERENCES companies(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE emails ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE emails ADD COLUMN IF NOT EXISTS recovery_email TEXT;
+
+CREATE INDEX IF NOT EXISTS emails_email_idx ON emails(LOWER(email));
+CREATE INDEX IF NOT EXISTS emails_linked_account_idx ON emails(linked_account_id);
+
 CREATE TABLE IF NOT EXISTS tutorials (
   id BIGSERIAL PRIMARY KEY,
   title TEXT NOT NULL,
@@ -246,32 +267,37 @@ CREATE TABLE IF NOT EXISTS user_preferences (
   PRIMARY KEY (user_email, pref_key)
 );
 
--- ── Disable RLS (internal tool — no user-specific row filtering needed) ────────
+-- ── Enable RLS (security: these tables hold credentials, 2FA secrets, VCC data) ─
+-- All table access goes through service-role server actions (src/lib/actions.ts),
+-- which bypass RLS. The browser anon key only does Auth + Storage, never table
+-- reads — so RLS on with no policies denies the public key while the app keeps
+-- working. Do NOT disable RLS here or grant table access to anon: the anon key
+-- ships to the browser, so that would expose all data to anyone with the URL.
 
-ALTER TABLE accounts DISABLE ROW LEVEL SECURITY;
-ALTER TABLE account_documents DISABLE ROW LEVEL SECURITY;
-ALTER TABLE apps DISABLE ROW LEVEL SECURITY;
-ALTER TABLE versions DISABLE ROW LEVEL SECURITY;
-ALTER TABLE app_screenshots DISABLE ROW LEVEL SECURITY;
-ALTER TABLE version_screenshots DISABLE ROW LEVEL SECURITY;
-ALTER TABLE listing_versions DISABLE ROW LEVEL SECURITY;
-ALTER TABLE expenses DISABLE ROW LEVEL SECURITY;
-ALTER TABLE income DISABLE ROW LEVEL SECURITY;
-ALTER TABLE settings DISABLE ROW LEVEL SECURITY;
-ALTER TABLE companies DISABLE ROW LEVEL SECURITY;
-ALTER TABLE company_documents DISABLE ROW LEVEL SECURITY;
-ALTER TABLE tutorials DISABLE ROW LEVEL SECURITY;
-ALTER TABLE missions DISABLE ROW LEVEL SECURITY;
-ALTER TABLE websites DISABLE ROW LEVEL SECURITY;
-ALTER TABLE nitch DISABLE ROW LEVEL SECURITY;
-ALTER TABLE notes DISABLE ROW LEVEL SECURITY;
-ALTER TABLE user_preferences DISABLE ROW LEVEL SECURITY;
+ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE account_documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE apps ENABLE ROW LEVEL SECURITY;
+ALTER TABLE versions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE app_screenshots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE version_screenshots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE listing_versions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE income ENABLE ROW LEVEL SECURITY;
+ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE company_documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE emails ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tutorials ENABLE ROW LEVEL SECURITY;
+ALTER TABLE missions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE websites ENABLE ROW LEVEL SECURITY;
+ALTER TABLE nitch ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_preferences ENABLE ROW LEVEL SECURITY;
 
--- ── Grant anon role full access (allows publishable key to work) ───────────────
-
+-- ── Least privilege: the anon role needs no direct table access ────────────────
 GRANT USAGE ON SCHEMA public TO anon;
-GRANT ALL ON ALL TABLES IN SCHEMA public TO anon;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon;
+REVOKE ALL ON ALL TABLES    IN SCHEMA public FROM anon;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon;
 
 -- ── Storage bucket ────────────────────────────────────────────────────────────
 
